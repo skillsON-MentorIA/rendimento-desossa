@@ -1,0 +1,6 @@
+{
+  "name": "FrigoKPI - Monitoramento de Desossa",
+  "description": "Sistema integrado de monitoramento de KPIs de performance para setor de desossa em frigorífico industrial com controle de rendimento, produtividade, perdas e One Page Report.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
