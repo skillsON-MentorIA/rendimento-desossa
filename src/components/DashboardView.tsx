@@ -12,6 +12,7 @@ import {
   BarChart3,
   Calendar,
   CalendarRange,
+  Clock,
   Layers,
   ArrowUpRight,
   Info,
@@ -398,6 +399,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </select>
             </div>
           )}
+
+          {/* Filtro de Turno colocado na barra cinza ao lado do campo data */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 shadow-2xs">
+            <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="text-slate-600 font-bold">Turno:</span>
+            <select
+              id="dash-select-shift"
+              value={filters.shift}
+              onChange={(e) => setFilters((f) => ({ ...f, shift: e.target.value as any }))}
+              className="bg-transparent font-bold text-slate-900 focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">Todos os Turnos</option>
+              <option value="Turno 1">Turno 1 (Manhã)</option>
+              <option value="Turno 2">Turno 2 (Tarde)</option>
+              <option value="Turno 3">Turno 3 (Noite)</option>
+            </select>
+          </div>
         </div>
       </div>
 

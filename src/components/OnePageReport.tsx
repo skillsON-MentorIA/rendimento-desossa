@@ -571,108 +571,6 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
           </div>
 
-          {/* BOX 2: NOVO BOX DE INDICADORES ACUMULADOS NO MÊS */}
-          <div className="mb-2.5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-black uppercase text-blue-950 tracking-wider flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                Indicadores Acumulados no Mês ({monthLabel} • {monthRecords.length} {monthRecords.length === 1 ? 'Lote' : 'Lotes'} {reportTypeFilter === 'ALL' ? 'Geral' : activeRecord.type === 'DIANTEIRO' ? 'DT' : 'TR'})
-              </span>
-              <span className="text-[9px] font-bold text-slate-500 font-mono">
-                Total Mês: {formatKg(monthSummary.totalRawMaterialKg, 0)} Carcaça
-              </span>
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {/* KPI 1 Mês - Margem de Lucro */}
-              <div className={`p-1.5 rounded text-center flex flex-col justify-between h-[62px] ${
-                monthSummary.avgProfitMarginPct >= 0
-                  ? 'bg-emerald-50/70 border border-emerald-200'
-                  : 'bg-rose-50/70 border border-rose-200'
-              }`}>
-                <span className={`text-[8.5px] font-bold uppercase tracking-tight block truncate h-3.5 leading-3.5 ${
-                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-900' : 'text-rose-900'
-                }`}>
-                  1. Margem de Lucro (Mês)
-                </span>
-                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${
-                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'
-                }`}>
-                  {formatPct(monthSummary.avgProfitMarginPct, 2)}
-                </span>
-                <span className={`text-[8.5px] font-bold block truncate h-3.5 leading-3.5 font-mono ${
-                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
-                }`}>
-                  {formatCurrency(monthSummary.totalGrossProfitValue)}
-                </span>
-              </div>
-
-              {/* KPI 2 Mês - Rend. Desossa */}
-              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
-                  2. Rend. Desossa (Mês)
-                </span>
-                <span className="h-6 flex items-center justify-center text-[13px] font-black text-emerald-700 font-mono tracking-tight leading-none">
-                  {formatPct(monthSummary.avgDeboningYieldNetPct, 2)}
-                </span>
-                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
-                  {formatKg(monthSummary.totalSaleableCutsKg, 0)} carnes
-                </span>
-              </div>
-
-              {/* KPI 3 Mês - Sub Produtos */}
-              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5" title="Sub Produtos Acumulados no Mês">
-                  3. Sub Produtos (Mês)
-                </span>
-                <span className="h-6 flex items-center justify-center text-[13px] font-black text-amber-800 font-mono tracking-tight leading-none">
-                  {formatPct(monthSummary.avgNonSaleablePct, 2)}
-                </span>
-                <span className="text-[8.5px] text-slate-600 font-medium block truncate h-3.5 leading-3.5 font-mono" title={`Osso: ${formatKg(monthSummary.totalBoneKg, 0)} (${formatPct(monthSummary.avgBonePct, 2)}) | Sebo: ${formatKg(monthSummary.totalFatKg, 0)} (${formatPct(monthSummary.avgFatPct, 2)})`}>
-                  Osso {formatPct(monthSummary.avgBonePct, 1)} • Sebo {formatPct(monthSummary.avgFatPct, 1)}
-                </span>
-              </div>
-
-              {/* KPI 4 Mês - Perda / Quebra */}
-              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
-                  4. Perda / Quebra (Mês)
-                </span>
-                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${monthSummary.avgLossPct <= 0.8 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                  {formatPct(monthSummary.avgLossPct, 3)}
-                </span>
-                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
-                  Quebra: {formatKg(monthSummary.totalLossKg, 1)}
-                </span>
-              </div>
-
-              {/* KPI 5 Mês - Faturamento PA */}
-              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
-                  5. Faturamento PA (Mês)
-                </span>
-                <span className="h-6 flex items-center justify-center text-[11.5px] font-black text-slate-900 font-mono tracking-tight leading-none truncate px-0.5">
-                  {formatCurrency(monthSummary.totalFinishedValue)}
-                </span>
-                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
-                  {formatKg(monthSummary.totalFinishedProductKg, 0)} acabados
-                </span>
-              </div>
-
-              {/* KPI 6 Mês - Produtividade */}
-              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
-                  6. Produtividade (Mês)
-                </span>
-                <span className="h-6 flex items-center justify-center text-[13px] font-black text-blue-900 font-mono tracking-tight leading-none">
-                  {monthSummary.avgProductivityKgPerPerson.toFixed(1)} <span className="text-[8.5px] font-normal ml-0.5">kg/p</span>
-                </span>
-                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5">
-                  Meta: 800 kg/p ({monthSummary.totalOperatorCount} pess.)
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* MAIN 2-COLUMN SECTION: MASS BALANCE + CUTS PERFORMANCE & MARGIN TABLE */}
           <div className="grid grid-cols-12 gap-3 mb-1 flex-1">
             {/* Coluna 1: Balanço Físico de Massa (5 colunas de 12) */}
@@ -886,6 +784,108 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 <span>Subprodutos: Osso ({formatKg(activeRecord.boneWeightKg, 1)}) • Sebo ({formatKg(activeRecord.fatWeightKg, 1)})</span>
                 <span className="font-bold text-slate-800">
                   Faturamento Total PA: {formatCurrency(activeRecordTotalValue)} | Margem da Desossa: <span className={`${activeRecordMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'} font-black`}>{formatPct(activeRecordMarginPct, 2)}</span> ({formatCurrency(activeRecordGrossProfit)})
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* BOX: INDICADORES ACUMULADOS NO MÊS (POSICIONADO NA PARTE INFERIOR DO RELATÓRIO) */}
+          <div className="mt-2.5 pt-2 border-t border-slate-200 shrink-0">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-black uppercase text-blue-950 tracking-wider flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                Indicadores Acumulados no Mês ({monthLabel} • {monthRecords.length} {monthRecords.length === 1 ? 'Lote' : 'Lotes'} {reportTypeFilter === 'ALL' ? 'Geral' : activeRecord.type === 'DIANTEIRO' ? 'DT' : 'TR'})
+              </span>
+              <span className="text-[9px] font-bold text-slate-500 font-mono">
+                Total Mês: {formatKg(monthSummary.totalRawMaterialKg, 0)} Carcaça
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {/* KPI 1 Mês - Margem de Lucro */}
+              <div className={`p-1.5 rounded text-center flex flex-col justify-between h-[62px] ${
+                monthSummary.avgProfitMarginPct >= 0
+                  ? 'bg-emerald-50/70 border border-emerald-200'
+                  : 'bg-rose-50/70 border border-rose-200'
+              }`}>
+                <span className={`text-[8.5px] font-bold uppercase tracking-tight block truncate h-3.5 leading-3.5 ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-900' : 'text-rose-900'
+                }`}>
+                  1. Margem de Lucro (Mês)
+                </span>
+                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'
+                }`}>
+                  {formatPct(monthSummary.avgProfitMarginPct, 2)}
+                </span>
+                <span className={`text-[8.5px] font-bold block truncate h-3.5 leading-3.5 font-mono ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                }`}>
+                  {formatCurrency(monthSummary.totalGrossProfitValue)}
+                </span>
+              </div>
+
+              {/* KPI 2 Mês - Rend. Desossa */}
+              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
+                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+                  2. Rend. Desossa (Mês)
+                </span>
+                <span className="h-6 flex items-center justify-center text-[13px] font-black text-emerald-700 font-mono tracking-tight leading-none">
+                  {formatPct(monthSummary.avgDeboningYieldNetPct, 2)}
+                </span>
+                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
+                  {formatKg(monthSummary.totalSaleableCutsKg, 0)} carnes
+                </span>
+              </div>
+
+              {/* KPI 3 Mês - Sub Produtos */}
+              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
+                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5" title="Sub Produtos Acumulados no Mês">
+                  3. Sub Produtos (Mês)
+                </span>
+                <span className="h-6 flex items-center justify-center text-[13px] font-black text-amber-800 font-mono tracking-tight leading-none">
+                  {formatPct(monthSummary.avgNonSaleablePct, 2)}
+                </span>
+                <span className="text-[8.5px] text-slate-600 font-medium block truncate h-3.5 leading-3.5 font-mono" title={`Osso: ${formatKg(monthSummary.totalBoneKg, 0)} (${formatPct(monthSummary.avgBonePct, 2)}) | Sebo: ${formatKg(monthSummary.totalFatKg, 0)} (${formatPct(monthSummary.avgFatPct, 2)})`}>
+                  Osso {formatPct(monthSummary.avgBonePct, 1)} • Sebo {formatPct(monthSummary.avgFatPct, 1)}
+                </span>
+              </div>
+
+              {/* KPI 4 Mês - Perda / Quebra */}
+              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
+                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+                  4. Perda / Quebra (Mês)
+                </span>
+                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${monthSummary.avgLossPct <= 0.8 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {formatPct(monthSummary.avgLossPct, 3)}
+                </span>
+                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
+                  Quebra: {formatKg(monthSummary.totalLossKg, 1)}
+                </span>
+              </div>
+
+              {/* KPI 5 Mês - Faturamento PA */}
+              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
+                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+                  5. Faturamento PA (Mês)
+                </span>
+                <span className="h-6 flex items-center justify-center text-[11.5px] font-black text-slate-900 font-mono tracking-tight leading-none truncate px-0.5">
+                  {formatCurrency(monthSummary.totalFinishedValue)}
+                </span>
+                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5 font-mono">
+                  {formatKg(monthSummary.totalFinishedProductKg, 0)} acabados
+                </span>
+              </div>
+
+              {/* KPI 6 Mês - Produtividade */}
+              <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
+                <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+                  6. Produtividade (Mês)
+                </span>
+                <span className="h-6 flex items-center justify-center text-[13px] font-black text-blue-900 font-mono tracking-tight leading-none">
+                  {monthSummary.avgProductivityKgPerPerson.toFixed(1)} <span className="text-[8.5px] font-normal ml-0.5">kg/p</span>
+                </span>
+                <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5">
+                  Meta: 800 kg/p ({monthSummary.totalOperatorCount} pess.)
                 </span>
               </div>
             </div>

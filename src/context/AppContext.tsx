@@ -61,19 +61,30 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY_RECORDS = 'frigo_kpi_records_v1';
-const STORAGE_KEY_USER = 'frigo_kpi_active_user_v2';
-const STORAGE_KEY_USERS = 'frigo_kpi_users_v2';
+const STORAGE_KEY_USER = 'frigo_kpi_active_user_v3';
+const STORAGE_KEY_USERS = 'frigo_kpi_users_v3';
 const STORAGE_KEY_BENCHMARKS = 'frigo_kpi_benchmarks_v1';
 const STORAGE_KEY_LAST_EXPORT = 'frigo_last_export_date_v1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Users list persisted in localStorage
   const [users, setUsers] = useState<User[]>(() => {
+    // Purge old versions that contained fictitious mock names
+    localStorage.removeItem('frigo_kpi_users_v2');
+    localStorage.removeItem('frigo_kpi_active_user_v2');
     const saved = localStorage.getItem(STORAGE_KEY_USERS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const sanitized = parsed.filter(
+            (u: User) =>
+              !u.name.includes('Roberto') &&
+              !u.name.includes('Carlos') &&
+              !u.name.includes('Arthur')
+          );
+          if (sanitized.length > 0) return sanitized;
+        }
       } catch (e) {
         console.error(e);
       }
@@ -81,13 +92,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS;
   });
 
-  // Current authenticated user (default to admin so initial load is seamless)
+  // Current authenticated user (default to José Marcelo admin)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_USER);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.username) return parsed;
+        if (
+          parsed &&
+          parsed.username &&
+          !parsed.name?.includes('Roberto') &&
+          !parsed.name?.includes('Carlos') &&
+          !parsed.name?.includes('Arthur')
+        ) {
+          return parsed;
+        }
       } catch (e) {
         console.error(e);
       }

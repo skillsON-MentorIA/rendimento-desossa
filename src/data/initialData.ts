@@ -3,32 +3,12 @@ import { MarketBenchmark, OperatorStat, ProductionRecord, User } from '../types'
 export const INITIAL_USERS: User[] = [
   {
     id: 'usr_admin',
-    name: 'Eng. Roberto Vasconcelos',
+    name: 'José Marcelo',
     username: 'admin',
     password: 'admin123',
     email: 'admin@frigo-industrial.com.br',
     role: 'ADMIN',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-    shift: 'Turno 1',
-  },
-  {
-    id: 'usr_gerente',
-    name: 'Carlos Mendes (Gerente Industrial)',
-    username: 'gerente',
-    password: 'gerente123',
-    email: 'gerente@frigo-industrial.com.br',
-    role: 'GERENCIAL',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-    shift: 'Turno 1',
-  },
-  {
-    id: 'usr_diretoria',
-    name: 'Dr. Arthur Prado (Diretor Operacional)',
-    username: 'diretoria',
-    password: 'diretoria123',
-    email: 'diretoria@frigo-industrial.com.br',
-    role: 'DIRETORIA',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
     shift: 'Turno 1',
   },
 ];
