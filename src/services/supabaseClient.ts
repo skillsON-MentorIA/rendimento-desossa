@@ -212,6 +212,112 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
 }
 
 /**
+ * Deletes a single production record from Supabase table.
+ */
+export async function deleteRecordFromSupabase(id: string): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Supabase não configurado. Exclusão feita apenas localmente.',
+    };
+  }
+
+  try {
+    const { error } = await client.from('production_records').delete().eq('id', id);
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: `Lote ${id} excluído com sucesso do banco de dados Supabase!`,
+    };
+  } catch (err: any) {
+    console.error('Erro ao excluir registro no Supabase:', err);
+    return {
+      success: false,
+      message: `Erro ao excluir lote do Supabase: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Deletes all production records from Supabase table.
+ */
+export async function deleteAllRecordsFromSupabase(): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Supabase não configurado.',
+    };
+  }
+
+  try {
+    const { error } = await client.from('production_records').delete().neq('id', '___safe_purge_all___');
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: 'Todos os lotes foram excluídos do banco Supabase.',
+    };
+  } catch (err: any) {
+    console.error('Erro ao limpar lotes do Supabase:', err);
+    return {
+      success: false,
+      message: `Erro ao limpar Supabase: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Fully synchronizes local records to Supabase, deleting any orphaned lotes
+ * in Supabase that are no longer present in the local database.
+ */
+export async function replaceRecordsInSupabase(records: ProductionRecord[]): Promise<{ success: boolean; message: string; deletedCount?: number }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Supabase não configurado.',
+    };
+  }
+
+  try {
+    // 1. Fetch current IDs stored in Supabase
+    const { data: existing, error: fetchErr } = await client.from('production_records').select('id');
+    if (fetchErr) throw fetchErr;
+
+    const currentIds = new Set(records.map((r) => r.id));
+    const toDeleteIds = (existing || [])
+      .map((e: any) => e.id)
+      .filter((id: string) => !currentIds.has(id));
+
+    // 2. Delete orphaned records from Supabase
+    if (toDeleteIds.length > 0) {
+      const { error: delErr } = await client.from('production_records').delete().in('id', toDeleteIds);
+      if (delErr) throw delErr;
+    }
+
+    // 3. Upsert current active records
+    if (records.length > 0) {
+      await syncRecordsToSupabase(records);
+    }
+
+    return {
+      success: true,
+      message: `Sincronização concluída: ${toDeleteIds.length} lote(s) órfão(s) excluído(s) da nuvem e ${records.length} lote(s) atualizado(s)!`,
+      deletedCount: toDeleteIds.length,
+    };
+  } catch (err: any) {
+    console.error('Erro na sincronização completa:', err);
+    return {
+      success: false,
+      message: `Erro ao sincronizar com Supabase: ${err.message}`,
+    };
+  }
+}
+
+/**
  * Fetches records from Supabase and transforms back to ProductionRecord[]
  */
 export async function fetchRecordsFromSupabase(): Promise<{ success: boolean; data?: ProductionRecord[]; message: string }> {

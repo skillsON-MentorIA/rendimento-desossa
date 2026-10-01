@@ -25,10 +25,11 @@ import {
   HelpCircle,
   Server,
   DollarSign,
-  Scale
+  Scale,
+  Beef
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { User, UserRole } from '../types';
+import { User, UserRole, ProductionRecord } from '../types';
 import { formatCurrency, formatPct } from '../utils/calculations';
 import {
   getSupabaseConfig,
@@ -50,6 +51,9 @@ export const AdminView: React.FC = () => {
     removeUser,
     updateUser,
     records,
+    deleteRecord,
+    deleteAllRecords,
+    syncCleanToSupabase,
     replaceRecords,
     benchmarks,
     updateBenchmark,
@@ -225,6 +229,48 @@ export const AdminView: React.FC = () => {
       showFeedback(`${res.data.length} lotes carregados com sucesso do Supabase!`, 'success');
     } else {
       showFeedback(res.message || 'Nenhum registro carregado.', res.success ? 'info' : 'error');
+    }
+  };
+
+  // Synchronize clean (purge orphaned records from Supabase)
+  const handleCleanSyncToSupabase = async () => {
+    setIsSyncing(true);
+    const res = await syncCleanToSupabase();
+    setIsSyncing(false);
+    if (res.success) {
+      showFeedback(res.message, 'success');
+    } else {
+      showFeedback(res.message, 'error');
+    }
+  };
+
+  // Delete single record from App and Supabase
+  const handleDeleteSingleRecord = async (rec: ProductionRecord) => {
+    if (!confirm(`Deseja realmente apagar o lote ${rec.type} de ${rec.date} (${rec.shift}) do aplicativo e da nuvem Supabase?`)) {
+      return;
+    }
+    setIsSyncing(true);
+    const res = await deleteRecord(rec.id);
+    setIsSyncing(false);
+    if (res.success) {
+      showFeedback(res.message || 'Lote excluído com sucesso do banco e do app!', 'success');
+    } else {
+      showFeedback(res.message, 'error');
+    }
+  };
+
+  // Delete all records from App and Supabase
+  const handleDeleteAllRecords = async () => {
+    if (!confirm('ATENÇÃO: Deseja realmente APAGAR TODOS OS RELATÓRIOS cadastrados no aplicativo e na nuvem Supabase? Esta ação é definitiva.')) {
+      return;
+    }
+    setIsSyncing(true);
+    const res = await deleteAllRecords();
+    setIsSyncing(false);
+    if (res.success) {
+      showFeedback(res.message, 'success');
+    } else {
+      showFeedback(res.message, 'error');
     }
   };
 
@@ -813,9 +859,21 @@ export const AdminView: React.FC = () => {
                   onClick={handleLoadFromSupabase}
                   disabled={isSyncing}
                   className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                  title="Carregar todos os lotes que estão salvos na nuvem do Supabase"
                 >
                   <Database className="w-3.5 h-3.5 text-emerald-400" />
                   Carregar da Nuvem
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCleanSyncToSupabase}
+                  disabled={isSyncing}
+                  className="px-3.5 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  title="Remove do Supabase qualquer lote que foi apagado no app e atualiza os existentes"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-purple-200" />
+                  Sincronizar Exclusões (Remover Órfãos)
                 </button>
               </div>
             </div>
@@ -921,6 +979,126 @@ export const AdminView: React.FC = () => {
                 <pre>{getSupabaseSetupSQL()}</pre>
               </div>
             </div>
+          </div>
+
+          {/* Card 3: Gestão de Lotes Cadastrados no Banco & Exclusão */}
+          <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Beef className="w-5 h-5 text-rose-700" />
+                  <h3 className="text-base font-bold text-slate-900">
+                    Lotes e Relatórios Cadastrados no Sistema ({records.length})
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Visualize os relatórios atualmente em vigor. Ao excluir um lote aqui, ele é removido imediatamente do APP e da nuvem Supabase.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCleanSyncToSupabase}
+                  disabled={isSyncing}
+                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  title="Garante que o Supabase contenha exatamente os lotes abaixo, apagando qualquer lote excluído anteriormente"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Sincronizar Exclusões
+                </button>
+
+                {records.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllRecords}
+                    disabled={isSyncing}
+                    className="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                    title="Excluir todos os relatórios do sistema e do Supabase para começar do zero"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    Apagar Todos os Lotes
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {records.length === 0 ? (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-500 text-xs">
+                <Beef className="w-8 h-8 text-slate-400 mx-auto mb-2 opacity-50" />
+                <p className="font-semibold text-slate-700">Nenhum lote cadastrado no momento.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  A base está limpa. Você pode fazer o upload de novos relatórios no menu "Upload SisAtak & Base".
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Lote / Data</th>
+                      <th className="py-2.5 px-3">Tipo</th>
+                      <th className="py-2.5 px-3">Turno / Líder</th>
+                      <th className="py-2.5 px-3 text-right">Matéria-Prima</th>
+                      <th className="py-2.5 px-3 text-right">Prod. Acabado</th>
+                      <th className="py-2.5 px-3 text-right">Quebra</th>
+                      <th className="py-2.5 px-3 text-center">Cortes</th>
+                      <th className="py-2.5 px-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {records.map((r) => (
+                      <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-slate-900">{r.date}</div>
+                          <div className="text-[10px] font-mono text-slate-400">{r.id}</div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
+                              r.type === 'DIANTEIRO'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                : 'bg-rose-100 text-rose-900 border border-rose-200'
+                            }`}
+                          >
+                            {r.type === 'DIANTEIRO' ? 'Dianteiro (DT)' : 'Traseiro (TR)'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          <div className="font-semibold">{r.shift}</div>
+                          <div className="text-[11px] text-slate-500">{r.responsibleOperator}</div>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
+                          {r.rawMaterialWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-emerald-800">
+                          {r.finishedProductWeightKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-rose-700">
+                          {r.lossPct.toFixed(3)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-bold">
+                            {r.cuts?.length || 0}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSingleRecord(r)}
+                            disabled={isSyncing}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-800 rounded-lg transition-colors"
+                            title="Apagar este lote do APP e do Supabase"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -11,6 +11,10 @@ import {
   syncRecordsToSupabase,
   fetchRecordsFromSupabase,
   syncUsersToSupabase,
+  deleteRecordFromSupabase,
+  deleteAllRecordsFromSupabase,
+  replaceRecordsInSupabase,
+  getSupabaseConfig,
 } from '../services/supabaseClient';
 
 interface AppContextType {
@@ -28,7 +32,8 @@ interface AppContextType {
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   addRecord: (record: ProductionRecord) => void;
-  deleteRecord: (id: string) => void;
+  deleteRecord: (id: string) => Promise<{ success: boolean; message: string }>;
+  deleteAllRecords: () => Promise<{ success: boolean; message: string }>;
   updateRecord: (record: ProductionRecord) => void;
   correctRecordDetails: (
     id: string,
@@ -55,12 +60,14 @@ interface AppContextType {
   isAdmin: boolean;
   isDirectoria: boolean;
   syncSupabase: () => Promise<{ success: boolean; message: string }>;
+  syncCleanToSupabase: () => Promise<{ success: boolean; message: string; deletedCount?: number }>;
   fetchSupabase: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY_RECORDS = 'frigo_kpi_records_v1';
+const STORAGE_KEY_DELETED_RECORDS = 'frigo_kpi_deleted_records_v1';
 const STORAGE_KEY_USER = 'frigo_kpi_active_user_v3';
 const STORAGE_KEY_USERS = 'frigo_kpi_users_v3';
 const STORAGE_KEY_BENCHMARKS = 'frigo_kpi_benchmarks_v1';
@@ -92,7 +99,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS;
   });
 
-  // Current authenticated user (default to José Marcelo admin)
+  // Current authenticated user
+  // CRITICAL: When no user is active or after logout, this MUST be null!
+  // It must NEVER default to INITIAL_USERS[0] on refresh when logged out.
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_USER);
     if (saved) {
@@ -111,36 +120,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.error(e);
       }
     }
-    return INITIAL_USERS[0];
+    return null;
   });
 
-  // Production records persisted in localStorage
+  // Production records persisted in localStorage with deleted IDs blacklist
   const [records, setRecords] = useState<ProductionRecord[]>(() => {
+    let deletedIds = new Set<string>();
+    try {
+      const savedDeleted = localStorage.getItem(STORAGE_KEY_DELETED_RECORDS);
+      if (savedDeleted) {
+        const parsedDel = JSON.parse(savedDeleted);
+        if (Array.isArray(parsedDel)) {
+          deletedIds = new Set(parsedDel);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
     const saved = localStorage.getItem(STORAGE_KEY_RECORDS);
-    if (saved) {
+    if (saved !== null) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const initialMap = new Map(INITIAL_PRODUCTION_RECORDS.map((r) => [r.id, r]));
-          // Upgrade any stored records where initial data has more cuts or newer complete SisAtak list
-          const upgraded = parsed.map((p: ProductionRecord) => {
-            const initRec = initialMap.get(p.id);
-            if (initRec && (!p.cuts || p.cuts.length < initRec.cuts.length || p.finishedProductTotalValue !== initRec.finishedProductTotalValue)) {
-              return initRec;
-            }
-            return p;
-          });
-          const existingIds = new Set(upgraded.map((p: ProductionRecord) => p.id));
-          const missing = INITIAL_PRODUCTION_RECORDS.filter((r) => !existingIds.has(r.id));
-          const result = missing.length > 0 ? [...upgraded, ...missing] : upgraded;
-          try {
-            localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(result));
-          } catch {}
-          return result;
+        if (Array.isArray(parsed)) {
+          // Return exactly the saved records without re-inserting deleted items
+          return parsed.filter((p: ProductionRecord) => !deletedIds.has(p.id));
         }
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+      }
     }
-    return INITIAL_PRODUCTION_RECORDS;
+
+    // First time opening the application ever (saved === null):
+    return INITIAL_PRODUCTION_RECORDS.filter((r) => !deletedIds.has(r.id));
   });
 
   const [lastExportDate, setLastExportDate] = useState<string | null>(() => {
@@ -287,6 +299,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEY_USER);
+    localStorage.removeItem('frigo_kpi_active_user_v2');
+    localStorage.removeItem('frigo_kpi_active_user_v1');
   };
 
   // Filter logic
@@ -330,14 +344,87 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date: newRec.date,
       viewMode: 'daily',
     }));
+
+    // If Supabase is configured, automatically send new batch to Supabase
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      syncRecordsToSupabase([newRec]).catch((err) => {
+        console.warn('Falha na sincronização em nuvem do novo lote:', err);
+      });
+    }
   };
 
-  const deleteRecord = (id: string) => {
-    setRecords((prev) => prev.filter((r) => r.id !== id));
+  const deleteRecord = async (id: string): Promise<{ success: boolean; message: string }> => {
+    // 1. Mark ID in blacklist so it never gets resurrected by initialData
+    try {
+      const savedDeleted = localStorage.getItem(STORAGE_KEY_DELETED_RECORDS);
+      const parsedDel = savedDeleted ? JSON.parse(savedDeleted) : [];
+      const updatedDel = Array.from(new Set([...(Array.isArray(parsedDel) ? parsedDel : []), id]));
+      localStorage.setItem(STORAGE_KEY_DELETED_RECORDS, JSON.stringify(updatedDel));
+    } catch (e) {
+      console.error(e);
+    }
+
+    // 2. Remove from local state and update localStorage
+    setRecords((prev) => {
+      const next = prev.filter((r) => r.id !== id);
+      try {
+        localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+
+    // 3. Immediately delete from Supabase if configured
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      return await deleteRecordFromSupabase(id);
+    }
+
+    return {
+      success: true,
+      message: 'Relatório excluído com sucesso da base de dados.',
+    };
+  };
+
+  const deleteAllRecords = async (): Promise<{ success: boolean; message: string }> => {
+    try {
+      const allIds = records.map((r) => r.id);
+      const savedDeleted = localStorage.getItem(STORAGE_KEY_DELETED_RECORDS);
+      const parsedDel = savedDeleted ? JSON.parse(savedDeleted) : [];
+      const updatedDel = Array.from(new Set([...(Array.isArray(parsedDel) ? parsedDel : []), ...allIds]));
+      localStorage.setItem(STORAGE_KEY_DELETED_RECORDS, JSON.stringify(updatedDel));
+    } catch (e) {
+      console.error(e);
+    }
+
+    setRecords([]);
+    try {
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify([]));
+    } catch (e) {
+      console.error(e);
+    }
+
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      return await deleteAllRecordsFromSupabase();
+    }
+
+    return {
+      success: true,
+      message: 'Todos os relatórios foram excluídos com sucesso.',
+    };
   };
 
   const updateRecord = (record: ProductionRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === record.id ? record : r)));
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      syncRecordsToSupabase([record]).catch((err) => {
+        console.warn('Falha ao atualizar lote no Supabase:', err);
+      });
+    }
   };
 
   const correctRecordDetails = (
@@ -351,8 +438,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notes?: string;
     }
   ) => {
-    setRecords((prev) =>
-      prev.map((r) => {
+    setRecords((prev) => {
+      const next = prev.map((r) => {
         if (r.id !== id) return r;
         const newCostPerKg = updates.carcassCostPerKg ?? r.carcassCostPerKg;
         const newOperatorCount = updates.operatorCount ?? r.operatorCount;
@@ -371,8 +458,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           profitMarginPct,
           productivityKgPerPerson,
         };
-      })
-    );
+      });
+
+      const updatedItem = next.find((r) => r.id === id);
+      if (updatedItem) {
+        const cfg = getSupabaseConfig();
+        if (cfg.isConfigured) {
+          syncRecordsToSupabase([updatedItem]).catch((err) => {
+            console.warn('Falha ao sincronizar correções no Supabase:', err);
+          });
+        }
+      }
+
+      return next;
+    });
   };
 
   const replaceRecords = (newRecords: ProductionRecord[]) => {
@@ -416,6 +515,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBenchmarks(INITIAL_MARKET_BENCHMARKS);
     setUsers(INITIAL_USERS);
     localStorage.removeItem(STORAGE_KEY_RECORDS);
+    localStorage.removeItem(STORAGE_KEY_DELETED_RECORDS);
     localStorage.removeItem(STORAGE_KEY_BENCHMARKS);
     localStorage.removeItem(STORAGE_KEY_USERS);
     const initialDate = INITIAL_PRODUCTION_RECORDS[0]?.date || '2026-08-28';
@@ -435,6 +535,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Supabase sync methods
   const syncSupabase = async () => {
     const res = await syncRecordsToSupabase(records);
+    await syncUsersToSupabase(users);
+    return res;
+  };
+
+  const syncCleanToSupabase = async () => {
+    const res = await replaceRecordsInSupabase(records);
     await syncUsersToSupabase(users);
     return res;
   };
@@ -474,6 +580,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setFilters,
         addRecord,
         deleteRecord,
+        deleteAllRecords,
         updateRecord,
         correctRecordDetails,
         replaceRecords,
@@ -490,6 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAdmin,
         isDirectoria,
         syncSupabase,
+        syncCleanToSupabase,
         fetchSupabase,
       }}
     >

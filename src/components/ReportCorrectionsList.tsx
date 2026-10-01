@@ -59,9 +59,10 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
     });
   }, [records, filterType, filterShift, searchTerm]);
 
-  const handleConfirmDelete = (id: string) => {
-    deleteRecord(id);
-    setFeedbackMsg('Relatório excluído com sucesso da base de dados. Você já pode fazer o novo upload do arquivo corrigido.');
+  const handleConfirmDelete = async (id: string) => {
+    const res = await deleteRecord(id);
+    setFeedbackMsg(res.message || 'Relatório excluído com sucesso da base de dados e do Supabase.');
+    setDeletingRecord(null);
     setTimeout(() => setFeedbackMsg(null), 4000);
   };
 

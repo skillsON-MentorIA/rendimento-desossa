@@ -66,7 +66,7 @@ export const DeleteRecordModal: React.FC<DeleteRecordModalProps> = ({
               <span className="font-bold block text-sm mb-1">
                 Atenção: Exclusão Permanente de Registro
               </span>
-              Você está prestes a apagar este relatório da base de dados do sistema. Esta ação remove todos os {record.cuts.length} cortes apurados e recalcula automaticamente todas as médias do Frigorífico.
+              Você está prestes a apagar este relatório da base de dados do sistema e da nuvem Supabase. Esta ação remove todos os {record.cuts.length} cortes apurados e recalcula automaticamente todas as médias do Frigorífico.
             </div>
           </div>
 
