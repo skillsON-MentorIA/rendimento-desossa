@@ -9,13 +9,11 @@ export interface ExcelImportResult {
 }
 
 /**
- * Exports the complete system database into an Excel (.xlsx) workbook,
- * formatted to be stored in the Intranet Drive.
+ * Exports the complete system database into an Excel (.xlsx) workbook.
  */
 export function exportMasterDatabaseToExcel(
   records: ProductionRecord[],
-  benchmarks: MarketBenchmark[] = [],
-  drivePath = '\\\\SRV-FRIGORIFICO\\Intranet\\Desossa\\BANCO_DADOS_DESOSSA.xlsx'
+  benchmarks: MarketBenchmark[] = []
 ): void {
   const wb = XLSX.utils.book_new();
 
@@ -186,28 +184,27 @@ export function exportMasterDatabaseToExcel(
     XLSX.utils.book_append_sheet(wb, wsBench, 'Metas_Benchmarks');
   }
 
-  // 5. Sheet: Info_Intranet
+  // 5. Sheet: Info_Sistema
   const infoData = [
     { 'Parâmetro': 'Sistema', 'Valor': 'Frigorífico KPI Pro - Módulo de Desossa Industrial' },
-    { 'Parâmetro': 'Drive Intranet', 'Valor': drivePath },
+    { 'Parâmetro': 'Banco de Dados', 'Valor': 'Supabase Cloud Database & SisAtak' },
     { 'Parâmetro': 'Data/Hora da Exportação', 'Valor': new Date().toLocaleString('pt-BR') },
     { 'Parâmetro': 'Total de Lotes Registrados', 'Valor': records.length },
     { 'Parâmetro': 'Total de Cortes Registrados', 'Valor': allCutsData.length },
-    { 'Parâmetro': 'Instrução para Gerente ATAK', 'Valor': 'Salve este arquivo na pasta do Drive da Intranet. Ele é o Banco de Dados Mestre do Frigorífico.' },
   ];
   const wsInfo = XLSX.utils.json_to_sheet(infoData);
-  XLSX.utils.book_append_sheet(wb, wsInfo, 'Info_Intranet');
+  XLSX.utils.book_append_sheet(wb, wsInfo, 'Info_Sistema');
 
   // Generate date stamp for file name
   const dateStr = new Date().toISOString().split('T')[0];
-  const fileName = `BANCO_DADOS_DESOSSA_INTRANET_${dateStr}.xlsx`;
+  const fileName = `BANCO_DADOS_DESOSSA_${dateStr}.xlsx`;
 
   // Write and trigger download
   XLSX.writeFile(wb, fileName);
 }
 
 /**
- * Imports records and cuts from a master Excel workbook stored in the Intranet Drive.
+ * Imports records and cuts from a master Excel workbook.
  */
 export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelImportResult> {
   return new Promise((resolve) => {
@@ -366,7 +363,7 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
 
         resolve({
           success: true,
-          message: `Banco de Dados importado com sucesso: ${importedRecords.length} lotes e ${rawCortes.length} itens de corte restaurados da planilha do Drive da Intranet.`,
+          message: `Banco de Dados importado com sucesso: ${importedRecords.length} lotes e ${rawCortes.length} itens de corte restaurados da planilha mestre.`,
           importedRecords,
           totalRecords: importedRecords.length,
         });

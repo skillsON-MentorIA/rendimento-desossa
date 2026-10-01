@@ -8,6 +8,10 @@ import {
   Building2,
   PanelLeftClose,
   PanelLeftOpen,
+  ShieldCheck,
+  Shield,
+  LogOut,
+  User as UserIcon,
   X
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -25,12 +29,13 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
+  onOpenLogin,
   isMobileOpen,
   setIsMobileOpen,
   isCollapsed,
   setIsCollapsed,
 }) => {
-  const { canUpload, isAdmin } = useApp();
+  const { canUpload, isAdmin, currentUser, logout } = useApp();
 
   const menuItems = [
     {
@@ -60,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: UploadCloud,
       badge: canUpload ? 'Ativo' : 'Bloq.',
       restricted: !canUpload,
-      desc: 'Diário, Correções e Drive Excel',
+      desc: canUpload ? 'Diário, Correções e Importação' : 'Restrito: Gerente / Admin',
     },
     {
       id: 'report',
@@ -69,14 +74,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'Diretoria',
       desc: 'Relatório Executivo A4 e Envio',
     },
-    {
-      id: 'settings',
-      label: 'Parâmetros & Custos',
-      icon: Settings,
-      badge: isAdmin ? 'Admin' : 'Restrito',
-      restricted: !isAdmin,
-      desc: 'Custo carcaça e metas',
-    },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin',
+            label: 'Menu Administrador',
+            icon: ShieldCheck,
+            badge: 'Admin',
+            restricted: false,
+            desc: 'Usuários, Supabase & Parâmetros',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -219,12 +228,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
+        {/* User Profile & Security Section */}
+        {currentUser && (
+          <div className="border-t border-slate-800 bg-slate-950/80 px-3 py-2.5 shrink-0">
+            {(!isCollapsed || isMobileOpen) ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 text-xs">
+                      {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white truncate leading-tight">
+                        {currentUser.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono truncate">
+                        @{currentUser.username}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Role Badge */}
+                  <span
+                    className={`text-[9px] px-2 py-0.5 rounded font-bold uppercase shrink-0 border ${
+                      currentUser.role === 'ADMIN'
+                        ? 'bg-purple-900/60 text-purple-200 border-purple-600/60'
+                        : currentUser.role === 'GERENCIAL'
+                        ? 'bg-blue-900/60 text-blue-200 border-blue-600/60'
+                        : 'bg-amber-900/60 text-amber-200 border-amber-600/60'
+                    }`}
+                  >
+                    {currentUser.role}
+                  </span>
+                </div>
+
+                {/* Logout Button */}
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-800/80 hover:bg-rose-950 hover:text-rose-200 text-slate-300 rounded-lg text-[11px] font-semibold transition-colors border border-slate-700/60 hover:border-rose-800"
+                  title="Encerrar sessão no sistema"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Sair do Sistema</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200 text-xs font-bold"
+                  title={`${currentUser.name} (${currentUser.role})`}
+                >
+                  {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="p-1.5 text-slate-400 hover:text-rose-300 hover:bg-slate-800 rounded-md transition-colors"
+                  title="Sair do Sistema"
+                >
+                  <LogOut className="w-4 h-4 text-rose-400" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer Controls: Only Collapse / Expand */}
         {(!isCollapsed || isMobileOpen) ? (
-          <div className="px-3 py-2.5 border-t border-slate-800 bg-slate-950/60 shrink-0">
+          <div className="px-3 py-2 border-t border-slate-800/60 bg-slate-950/40 shrink-0">
             <button
               onClick={() => setIsCollapsed(true)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/70 hover:bg-slate-800 text-slate-300 hover:text-white text-[11px] font-medium border border-slate-700/60 transition-colors"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white text-[11px] font-medium border border-slate-700/40 transition-colors"
               title="Recolher Menu Lateral"
             >
               <span className="flex items-center gap-2">
@@ -235,7 +310,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         ) : (
-          <div className="p-3 border-t border-slate-800 flex justify-center shrink-0">
+          <div className="p-2 border-t border-slate-800/60 flex justify-center shrink-0">
             <button
               onClick={() => setIsCollapsed(false)}
               title="Expandir Menu Lateral"

@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatPct } from '../utils/calculations';
-import { IntranetDatabaseSection } from './IntranetDatabaseSection';
 
 export const SettingsView: React.FC = () => {
   const {
@@ -246,9 +245,6 @@ export const SettingsView: React.FC = () => {
           ))}
         </div>
       </div>
-
-      {/* Banco de Dados Excel no Drive da Intranet */}
-      <IntranetDatabaseSection />
 
       {/* Perfis de Acesso e Níveis de Segurança */}
       <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-2xs">

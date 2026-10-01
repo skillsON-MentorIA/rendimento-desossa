@@ -8,7 +8,9 @@ import {
   FileSpreadsheet,
   PanelLeftClose,
   PanelLeftOpen,
-  CalendarRange
+  CalendarRange,
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -18,6 +20,7 @@ interface HeaderProps {
   onToggleCollapse: () => void;
   isCollapsed: boolean;
   onNavigateToOnePage: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -26,8 +29,9 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleCollapse,
   isCollapsed,
   onNavigateToOnePage,
+  onOpenLogin,
 }) => {
-  const { filters, setFilters, records } = useApp();
+  const { filters, setFilters, records, currentUser, logout } = useApp();
 
   // Extract unique dates from records
   const availableDates = Array.from(new Set(records.map((r) => r.date))).sort().reverse();
@@ -146,6 +150,33 @@ export const Header: React.FC<HeaderProps> = ({
               <FileSpreadsheet className="w-4 h-4" />
               <span className="hidden sm:inline">One Page Report</span>
             </button>
+
+            {currentUser && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase border ${
+                    currentUser.role === 'ADMIN'
+                      ? 'bg-purple-100 text-purple-900 border-purple-300'
+                      : currentUser.role === 'GERENCIAL'
+                      ? 'bg-blue-100 text-blue-900 border-blue-300'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
+                  }`}
+                  title={`Usuário autenticado: ${currentUser.name} (${currentUser.username})`}
+                >
+                  {currentUser.role}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-slate-500 hover:text-rose-700 hover:bg-rose-50 rounded-md transition-colors text-xs font-semibold border border-transparent hover:border-rose-200"
+                  title="Encerrar sessão / Sair"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden md:inline">Sair</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

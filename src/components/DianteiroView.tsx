@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   TrendingUp,
+  TrendingDown,
   Info,
   Layers,
   ArrowDownRight,
@@ -321,18 +322,24 @@ export const DianteiroView: React.FC = () => {
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Margem Bruta da Operação da Desossa sobre o Somatório dos Cortes">
               Margem de Lucro DT
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-4 h-4" />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+              operationMarginOnRevenuePct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+            }`}>
+              {operationMarginOnRevenuePct >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
             </div>
           </div>
           <div className="my-auto py-1">
-            <div className="text-2xl font-black text-emerald-700 tracking-tight whitespace-nowrap">
+            <div className={`text-2xl font-black tracking-tight whitespace-nowrap ${
+              operationMarginOnRevenuePct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+            }`}>
               {formatPct(operationMarginOnRevenuePct, 2)}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">Margem Bruta:</span>
-            <span className="font-bold text-emerald-700 text-xs whitespace-nowrap">{formatCurrency(operationGrossProfit)}</span>
+            <span className={`font-bold text-xs whitespace-nowrap ${
+              operationGrossProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'
+            }`}>{formatCurrency(operationGrossProfit)}</span>
           </div>
         </div>
       </div>
@@ -616,32 +623,52 @@ export const DianteiroView: React.FC = () => {
             </div>
 
             {/* Box 3: Margem Bruta em R$ */}
-            <div className="bg-white p-3 rounded-lg border border-emerald-200 shadow-2xs">
-              <span className="text-[10px] font-bold text-emerald-900 uppercase block mb-1">
+            <div className={`p-3 rounded-lg border shadow-2xs ${
+              operationGrossProfit >= 0 ? 'bg-white border-emerald-200' : 'bg-rose-50 border-rose-300'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase block mb-1 ${
+                operationGrossProfit >= 0 ? 'text-emerald-900' : 'text-rose-950'
+              }`}>
                 3. (=) Margem Bruta (R$)
               </span>
-              <div className="text-base font-black text-emerald-800 font-mono">
+              <div className={`text-base font-black font-mono ${
+                operationGrossProfit >= 0 ? 'text-emerald-800' : 'text-rose-600'
+              }`}>
                 {formatCurrency(operationGrossProfit)}
               </div>
-              <span className="text-[10px] text-emerald-700 block mt-0.5">
-                Ganho absoluto após desossar a carcaça
+              <span className={`text-[10px] block mt-0.5 ${
+                operationGrossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'
+              }`}>
+                {operationGrossProfit >= 0 ? 'Ganho absoluto após desossar a carcaça' : 'Resultado deficitário da carcaça'}
               </span>
             </div>
 
             {/* Box 4: Indicadores Proporcionais */}
-            <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-300 shadow-2xs">
-              <span className="text-[10px] font-bold text-emerald-950 uppercase block mb-1">
+            <div className={`p-3 rounded-lg border shadow-2xs ${
+              operationMarginOnRevenuePct >= 0
+                ? 'bg-emerald-50 border-emerald-300'
+                : 'bg-rose-50 border-rose-300'
+            }`}>
+              <span className={`text-[10px] font-bold uppercase block mb-1 ${
+                operationMarginOnRevenuePct >= 0 ? 'text-emerald-950' : 'text-rose-950'
+              }`}>
                 4. Proporção & Margem Bruta
               </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-base font-black text-emerald-900 font-mono">
+                <span className={`text-base font-black font-mono ${
+                  operationMarginOnRevenuePct >= 0 ? 'text-emerald-900' : 'text-rose-600'
+                }`}>
                   {formatPct(operationMarginOnRevenuePct, 2)}
                 </span>
-                <span className="text-[10px] text-emerald-700 font-bold">
+                <span className={`text-[10px] font-bold ${
+                  operationMarginOnRevenuePct >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                }`}>
                   (s/ Faturamento)
                 </span>
               </div>
-              <div className="text-[10px] text-emerald-800 mt-1 flex items-center justify-between border-t border-emerald-200 pt-1">
+              <div className={`text-[10px] mt-1 flex items-center justify-between border-t pt-1 ${
+                operationMarginOnRevenuePct >= 0 ? 'text-emerald-800 border-emerald-200' : 'text-rose-800 border-rose-200'
+              }`}>
                 <span>Markup s/ Carcaça:</span>
                 <strong className="font-mono">+{formatPct(operationMarginOnCostPct, 2)}</strong>
               </div>

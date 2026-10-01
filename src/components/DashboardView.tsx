@@ -537,18 +537,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Margem de Lucro Bruta sobre Faturamento do PA">
               Margem de Lucro
             </span>
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-4 h-4" />
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+              summary.avgProfitMarginPct >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+            }`}>
+              {summary.avgProfitMarginPct >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
             </div>
           </div>
           <div className="my-auto py-1">
-            <div className="text-2xl font-black text-emerald-700 tracking-tight whitespace-nowrap">
+            <div className={`text-2xl font-black tracking-tight whitespace-nowrap ${
+              summary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+            }`}>
               {formatPct(summary.avgProfitMarginPct, 2)}
             </div>
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">Margem Bruta:</span>
-            <span className="font-bold text-emerald-700 text-xs whitespace-nowrap">{formatCurrency(summary.totalGrossProfitValue)}</span>
+            <span className={`font-bold text-xs whitespace-nowrap ${
+              summary.totalGrossProfitValue >= 0 ? 'text-emerald-700' : 'text-rose-600'
+            }`}>{formatCurrency(summary.totalGrossProfitValue)}</span>
           </div>
         </div>
 
@@ -955,7 +961,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Margem Operacional:</span>
-                  <span className="font-bold text-emerald-700">{formatPct(dtSummary.avgProfitMarginPct, 2)}</span>
+                  <span className={`font-bold ${dtSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(dtSummary.avgProfitMarginPct, 2)}</span>
                 </div>
               </div>
             </div>
@@ -988,7 +994,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Margem Operacional:</span>
-                  <span className="font-bold text-emerald-700">{formatPct(trSummary.avgProfitMarginPct, 2)}</span>
+                  <span className={`font-bold ${trSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(trSummary.avgProfitMarginPct, 2)}</span>
                 </div>
               </div>
             </div>
@@ -1173,7 +1179,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <td className="py-3 px-3 text-right font-mono text-slate-800 font-medium">
                       {formatWeightNum(r.productivityKgPerPerson, 1)} kg
                     </td>
-                    <td className="py-3 px-3 text-right font-mono font-bold text-emerald-700">
+                    <td className={`py-3 px-3 text-right font-mono font-bold ${
+                      r.profitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                    }`}>
                       {formatPct(r.profitMarginPct, 2)}
                     </td>
                     <td className="py-3 px-3 text-center">

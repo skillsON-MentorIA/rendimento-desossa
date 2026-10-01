@@ -25,11 +25,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const success = login(username, password);
-    if (success) {
+    const res = login(username, password);
+    if (res.success) {
       onClose();
     } else {
-      setError('Usuário ou senha inválidos. Tente admin / admin123');
+      setError(res.message || 'Usuário ou senha inválidos. Tente admin / admin123');
     }
   };
 
@@ -62,20 +62,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
         {/* Modal Body */}
         <div className="p-6 space-y-5">
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600">
-            <span className="font-semibold text-slate-900 block mb-1">
-              Usuário Atual Conectado:
-            </span>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="font-bold text-slate-800">{currentUser.name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 font-mono font-bold text-slate-700">
-                  {currentUser.role}
-                </span>
+          {currentUser && (
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs text-slate-600">
+              <span className="font-semibold text-slate-900 block mb-1">
+                Usuário Atual Conectado:
+              </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="font-bold text-slate-800">{currentUser.name}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 font-mono font-bold text-slate-700">
+                    {currentUser.role}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -140,7 +142,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                   type="button"
                   onClick={() => handleQuickLogin(u.username, u.role === 'ADMIN' ? 'admin123' : u.role === 'GERENCIAL' ? 'gerente123' : 'diretoria123')}
                   className={`w-full p-2 text-left rounded-lg border text-xs transition-colors flex items-center justify-between ${
-                    currentUser.id === u.id
+                    currentUser?.id === u.id
                       ? 'border-emerald-300 bg-emerald-50/60 font-semibold'
                       : 'border-slate-200 hover:bg-slate-50'
                   }`}

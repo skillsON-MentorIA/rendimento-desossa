@@ -13,9 +13,12 @@ import { TraseiroView } from './components/TraseiroView';
 import { UploadView } from './components/UploadView';
 import { OnePageReport } from './components/OnePageReport';
 import { SettingsView } from './components/SettingsView';
+import { AdminView } from './components/AdminView';
+import { LoginScreen } from './components/LoginScreen';
 import { LoginModal } from './components/LoginModal';
 
 const MainLayout: React.FC = () => {
+  const { currentUser } = useApp();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -38,6 +41,11 @@ const MainLayout: React.FC = () => {
     setSelectedRecordForReport(newRecordId);
     setCurrentTab('report');
   };
+
+  // If no user is logged in, show full screen corporative login page
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
 
   return (
     <div
@@ -66,6 +74,7 @@ const MainLayout: React.FC = () => {
           onToggleCollapse={handleToggleCollapse}
           isCollapsed={sidebarCollapsed}
           onNavigateToOnePage={() => setCurrentTab('report')}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
         {/* Dynamic View Body */}
@@ -94,7 +103,7 @@ const MainLayout: React.FC = () => {
             <OnePageReport selectedRecordId={selectedRecordForReport} />
           )}
 
-          {currentTab === 'settings' && <SettingsView />}
+          {(currentTab === 'admin' || currentTab === 'settings') && <AdminView />}
         </main>
       </div>
 

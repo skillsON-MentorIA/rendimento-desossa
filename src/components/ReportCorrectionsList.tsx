@@ -33,7 +33,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
   onSelectReportForOPR,
   onNavigateToUpload,
 }) => {
-  const { records, deleteRecord, correctRecordDetails, benchmarks, intranetDrivePath, canEdit } = useApp();
+  const { records, deleteRecord, correctRecordDetails, benchmarks, canEdit } = useApp();
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterType, setFilterType] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO'>('ALL');
@@ -82,7 +82,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
   };
 
   const handleExportSingleBatch = (rec: ProductionRecord) => {
-    exportMasterDatabaseToExcel([rec], benchmarks, intranetDrivePath);
+    exportMasterDatabaseToExcel([rec], benchmarks);
   };
 
   return (
@@ -255,8 +255,12 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
 
                       {/* Margem */}
                       <td className="py-3 px-3 text-right font-mono">
-                        <span className="font-bold text-emerald-700">{formatPct(rec.profitMarginPct, 1)}</span>
-                        <div className="text-[10px] text-slate-500">{formatCurrency(rec.grossProfitValue)}</div>
+                        <span className={`font-bold ${rec.profitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {formatPct(rec.profitMarginPct, 1)}
+                        </span>
+                        <div className={`text-[10px] ${rec.grossProfitValue >= 0 ? 'text-slate-500' : 'text-rose-600 font-medium'}`}>
+                          {formatCurrency(rec.grossProfitValue)}
+                        </div>
                       </td>
 
                       {/* Ações */}

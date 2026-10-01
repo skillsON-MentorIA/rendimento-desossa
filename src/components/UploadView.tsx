@@ -28,7 +28,6 @@ import { formatCurrency, formatKg, formatPct } from '../utils/calculations';
 import { parseSisAtakReport } from '../utils/parser';
 import { extractTextFromFile } from '../utils/fileExtractor';
 import { ReportCorrectionsList } from './ReportCorrectionsList';
-import { IntranetDatabaseSection } from './IntranetDatabaseSection';
 
 interface UploadViewProps {
   onSuccessUpload: (newRecordId: string) => void;
@@ -37,7 +36,7 @@ interface UploadViewProps {
 export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
   const { addRecord, canUpload, currentUser, records } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'upload' | 'corrections' | 'database'>('upload');
+  const [activeSubTab, setActiveSubTab] = useState<'upload' | 'corrections'>('upload');
 
   const [rawText, setRawText] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
@@ -177,7 +176,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
           <ShieldAlert className="w-6 h-6" />
         </div>
         <h3 className="text-lg font-bold text-slate-900">
-          Acesso Restrito: Perfil {currentUser.role}
+          Acesso Restrito: Perfil {currentUser?.role || 'DIRETORIA'}
         </h3>
         <p className="text-sm text-slate-600 mt-2">
           O perfil de <strong>DIRETORIA</strong> possui permissão de <strong>Apenas Visualização</strong> dos dashboards, KPIs e relatórios executivos.
@@ -197,13 +196,13 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
               <UploadCloud className="w-3.5 h-3.5" />
-              CENTRAL DO GERENTE ATAK • INTRANET DO FRIGORÍFICO
+              CENTRAL DO GERENTE ATAK • GESTÃO DE LOTES E UPLOAD
             </div>
             <h2 className="text-xl font-bold mt-1 tracking-tight">
-              Ingestão Diária, Correções e Banco de Dados Excel
+              Ingestão Diária, Auditoria Técnica e Correções
             </h2>
             <p className="text-xs text-slate-300 mt-0.5">
-              Faça o upload do RETQ010 diário, gerencie relatórios com erro e sincronize a planilha Excel no Drive da Intranet
+              Faça o upload do RETQ010 diário, valide o balanço físico de massa e gerencie os relatórios cadastrados
             </p>
           </div>
 
@@ -243,19 +242,6 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
             <span className="px-1.5 py-0.2 rounded bg-slate-950/60 text-[10px] text-slate-300 font-mono">
               {records.length}
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSubTab('database')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-              activeSubTab === 'database'
-                ? 'bg-rose-900 text-white shadow-sm border border-rose-700'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>3. Banco de Dados Excel (Drive Intranet)</span>
           </button>
         </div>
       </div>
@@ -697,11 +683,6 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
           onSelectReportForOPR={(id) => onSuccessUpload(id)}
           onNavigateToUpload={() => setActiveSubTab('upload')}
         />
-      )}
-
-      {/* Sub-tab 3: Intranet Excel Database Manager */}
-      {activeSubTab === 'database' && (
-        <IntranetDatabaseSection />
       )}
     </div>
   );

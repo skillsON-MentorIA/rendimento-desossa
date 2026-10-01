@@ -45,7 +45,6 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     filters,
     deleteRecord,
     correctRecordDetails,
-    intranetDrivePath,
     canEdit,
   } = useApp();
   
@@ -137,8 +136,8 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
   const handleExportExcel = () => {
     if (!activeRecord) return;
     try {
-      exportMasterDatabaseToExcel([activeRecord], benchmarks, intranetDrivePath);
-      setFeedbackMsg(`Planilha Excel deste lote gerada com sucesso para salvar no Drive da Intranet.`);
+      exportMasterDatabaseToExcel([activeRecord], benchmarks);
+      setFeedbackMsg(`Planilha Excel deste lote gerada e baixada com sucesso.`);
       setTimeout(() => setFeedbackMsg(null), 4000);
     } catch (e: any) {
       console.error(e);
@@ -481,14 +480,24 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
             <div className="grid grid-cols-6 gap-2">
               {/* KPI 1 - Margem de Lucro */}
-              <div className="p-1.5 rounded bg-emerald-50 border border-emerald-300 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-emerald-900 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+              <div className={`p-1.5 rounded text-center flex flex-col justify-between h-[62px] ${
+                activeRecordMarginPct >= 0
+                  ? 'bg-emerald-50 border border-emerald-300'
+                  : 'bg-rose-50 border border-rose-300'
+              }`}>
+                <span className={`text-[8.5px] font-bold uppercase tracking-tight block truncate h-3.5 leading-3.5 ${
+                  activeRecordMarginPct >= 0 ? 'text-emerald-900' : 'text-rose-900'
+                }`}>
                   1. Margem de Lucro
                 </span>
-                <span className="h-6 flex items-center justify-center text-[13px] font-black text-emerald-800 font-mono tracking-tight leading-none">
+                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${
+                  activeRecordMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'
+                }`}>
                   {formatPct(activeRecordMarginPct, 2)}
                 </span>
-                <span className="text-[8.5px] text-emerald-700 font-bold block truncate h-3.5 leading-3.5 font-mono">
+                <span className={`text-[8.5px] font-bold block truncate h-3.5 leading-3.5 font-mono ${
+                  activeRecordMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                }`}>
                   {formatCurrency(activeRecordGrossProfit)}
                 </span>
               </div>
@@ -575,14 +584,24 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
             <div className="grid grid-cols-6 gap-2">
               {/* KPI 1 Mês - Margem de Lucro */}
-              <div className="p-1.5 rounded bg-emerald-50/70 border border-emerald-200 text-center flex flex-col justify-between h-[62px]">
-                <span className="text-[8.5px] font-bold text-emerald-900 uppercase tracking-tight block truncate h-3.5 leading-3.5">
+              <div className={`p-1.5 rounded text-center flex flex-col justify-between h-[62px] ${
+                monthSummary.avgProfitMarginPct >= 0
+                  ? 'bg-emerald-50/70 border border-emerald-200'
+                  : 'bg-rose-50/70 border border-rose-200'
+              }`}>
+                <span className={`text-[8.5px] font-bold uppercase tracking-tight block truncate h-3.5 leading-3.5 ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-900' : 'text-rose-900'
+                }`}>
                   1. Margem de Lucro (Mês)
                 </span>
-                <span className="h-6 flex items-center justify-center text-[13px] font-black text-emerald-800 font-mono tracking-tight leading-none">
+                <span className={`h-6 flex items-center justify-center text-[13px] font-black font-mono tracking-tight leading-none ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'
+                }`}>
                   {formatPct(monthSummary.avgProfitMarginPct, 2)}
                 </span>
-                <span className="text-[8.5px] text-emerald-700 font-bold block truncate h-3.5 leading-3.5 font-mono">
+                <span className={`text-[8.5px] font-bold block truncate h-3.5 leading-3.5 font-mono ${
+                  monthSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                }`}>
                   {formatCurrency(monthSummary.totalGrossProfitValue)}
                 </span>
               </div>
@@ -674,6 +693,15 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                     </span>
                   </div>
 
+                  <div className="flex justify-between py-0.5 border-b border-slate-100 bg-amber-50/70 px-1 -mx-1 rounded">
+                    <span className="font-bold text-amber-950">PESO MÉDIO DA CARCAÇA (Kg):</span>
+                    <span className="font-black font-mono text-amber-900">
+                      {activeRecord.rawMaterialBoxes > 0
+                        ? `${formatWeightNum(activeRecord.rawMaterialWeightKg / activeRecord.rawMaterialBoxes, 2)} kg`
+                        : `${formatWeightNum(activeRecord.rawMaterialAvgWeightKg || 0, 2)} kg`}
+                    </span>
+                  </div>
+
                   <div className="flex justify-between py-0.5 border-b border-slate-100">
                     <span className="font-semibold text-slate-700">Produto Acabado Total:</span>
                     <span className="font-bold font-mono text-slate-900">
@@ -747,7 +775,9 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   <span>Faturamento dos Cortes:</span>
                   <span className="font-mono font-bold">{formatCurrency(activeRecordTotalValue)}</span>
                 </div>
-                <div className="flex justify-between text-emerald-800 font-bold border-t border-slate-200 pt-1 mt-1">
+                <div className={`flex justify-between font-bold border-t border-slate-200 pt-1 mt-1 ${
+                  activeRecordGrossProfit >= 0 ? 'text-emerald-800' : 'text-rose-600'
+                }`}>
                   <span>Margem Bruta Agregada:</span>
                   <span className="font-mono">{formatCurrency(activeRecordGrossProfit)} ({formatPct(activeRecordMarginPct, 2)})</span>
                 </div>
@@ -841,7 +871,9 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                       <td className="py-1 px-1 text-right font-mono text-slate-900 font-black">
                         {formatCurrency(totalSaleableCutsValue)}
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono text-emerald-800 font-black">
+                      <td className={`py-1 px-1.5 text-right font-mono font-black ${
+                        activeRecordMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'
+                      }`}>
                         {formatPct(activeRecordMarginPct, 2)}
                       </td>
                     </tr>
@@ -853,7 +885,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               <div className="mt-1 pt-1 border-t border-slate-200 text-[8.5px] flex justify-between text-slate-600 font-medium">
                 <span>Subprodutos: Osso ({formatKg(activeRecord.boneWeightKg, 1)}) • Sebo ({formatKg(activeRecord.fatWeightKg, 1)})</span>
                 <span className="font-bold text-slate-800">
-                  Faturamento Total PA: {formatCurrency(activeRecordTotalValue)} | Margem da Desossa: <span className="text-emerald-800 font-black">{formatPct(activeRecordMarginPct, 2)}</span> ({formatCurrency(activeRecordGrossProfit)})
+                  Faturamento Total PA: {formatCurrency(activeRecordTotalValue)} | Margem da Desossa: <span className={`${activeRecordMarginPct >= 0 ? 'text-emerald-800' : 'text-rose-600'} font-black`}>{formatPct(activeRecordMarginPct, 2)}</span> ({formatCurrency(activeRecordGrossProfit)})
                 </span>
               </div>
             </div>

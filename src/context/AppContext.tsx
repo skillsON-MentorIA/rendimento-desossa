@@ -7,11 +7,19 @@ import {
 } from '../data/initialData';
 import { FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
 import { CalculatedSummary, calculateSummary } from '../utils/calculations';
+import {
+  syncRecordsToSupabase,
+  fetchRecordsFromSupabase,
+  syncUsersToSupabase,
+} from '../services/supabaseClient';
 
 interface AppContextType {
-  currentUser: User;
-  setCurrentUser: (user: User) => void;
+  currentUser: User | null;
+  setCurrentUser: (user: User | null) => void;
   users: User[];
+  addUser: (user: Omit<User, 'id'>) => void;
+  removeUser: (userId: string) => boolean;
+  updateUser: (userId: string, updates: Partial<User>) => void;
   records: ProductionRecord[];
   filteredRecords: ProductionRecord[];
   summary: CalculatedSummary;
@@ -35,37 +43,59 @@ interface AppContextType {
   ) => void;
   replaceRecords: (newRecords: ProductionRecord[]) => void;
   mergeRecords: (newRecords: ProductionRecord[]) => void;
-  intranetDrivePath: string;
-  setIntranetDrivePath: (path: string) => void;
   lastExportDate: string | null;
   setLastExportDate: (date: string | null) => void;
   updateBenchmark: (code: string, newExpectedPct: number) => void;
   updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO', newCost: number) => void;
   resetToDemoData: () => void;
-  login: (username: string, password?: string) => boolean;
+  login: (username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
   canEdit: boolean;
   canUpload: boolean;
   isAdmin: boolean;
+  isDirectoria: boolean;
+  syncSupabase: () => Promise<{ success: boolean; message: string }>;
+  fetchSupabase: () => Promise<{ success: boolean; message: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY_RECORDS = 'frigo_kpi_records_v1';
-const STORAGE_KEY_USER = 'frigo_kpi_user_v1';
+const STORAGE_KEY_USER = 'frigo_kpi_active_user_v2';
+const STORAGE_KEY_USERS = 'frigo_kpi_users_v2';
 const STORAGE_KEY_BENCHMARKS = 'frigo_kpi_benchmarks_v1';
-const STORAGE_KEY_DRIVE_PATH = 'frigo_intranet_drive_path_v1';
 const STORAGE_KEY_LAST_EXPORT = 'frigo_last_export_date_v1';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_USER);
+  // Users list persisted in localStorage
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_USERS);
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
     }
-    return INITIAL_USERS[0]; // Admin by default
+    return INITIAL_USERS;
   });
 
+  // Current authenticated user (default to admin so initial load is seamless)
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_USER);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.username) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return INITIAL_USERS[0];
+  });
+
+  // Production records persisted in localStorage
   const [records, setRecords] = useState<ProductionRecord[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_RECORDS);
     if (saved) {
@@ -92,10 +122,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) { console.error(e); }
     }
     return INITIAL_PRODUCTION_RECORDS;
-  });
-
-  const [intranetDrivePath, setIntranetDrivePath] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_DRIVE_PATH) || '\\\\SRV-FRIGORIFICO\\Intranet\\Desossa\\BANCO_DADOS_DESOSSA.xlsx';
   });
 
   const [lastExportDate, setLastExportDate] = useState<string | null>(() => {
@@ -146,36 +172,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   });
 
-  // Auto-heal: Ensure filters.date is always synchronized with available records
+  // Save changes to localStorage
   useEffect(() => {
-    if (records.length === 0) return;
-    const availableDates = Array.from(new Set(records.map((r) => r.date))).sort().reverse();
-    if (!filters.date || !availableDates.includes(filters.date)) {
-      const fallbackDate = availableDates[0];
-      setFilters((prev) => ({
-        ...prev,
-        date: fallbackDate,
-        month: fallbackDate.substring(0, 7),
-      }));
+    try {
+      localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
+    } catch (e) {
+      console.error('Storage quota exceeded for records:', e);
     }
-  }, [records, filters.date]);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_RECORDS, JSON.stringify(records));
   }, [records]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [users]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_USER);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_BENCHMARKS, JSON.stringify(benchmarks));
   }, [benchmarks]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_DRIVE_PATH, intranetDrivePath);
-  }, [intranetDrivePath]);
 
   useEffect(() => {
     if (lastExportDate) {
@@ -183,61 +207,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [lastExportDate]);
 
-  // Filter records
+  // User management methods
+  const addUser = (userData: Omit<User, 'id'>) => {
+    const cleanUsername = userData.username.trim().toLowerCase();
+    const exists = users.some((u) => u.username.toLowerCase() === cleanUsername);
+    if (exists) {
+      throw new Error(`O usuário "${cleanUsername}" já existe no sistema. Escolha outro login.`);
+    }
+
+    const newUser: User = {
+      ...userData,
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      username: cleanUsername,
+    };
+
+    setUsers((prev) => [...prev, newUser]);
+  };
+
+  const removeUser = (userId: string): boolean => {
+    if (currentUser?.id === userId) return false;
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    return true;
+  };
+
+  const updateUser = (userId: string, updates: Partial<User>) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, ...updates } : u))
+    );
+    if (currentUser?.id === userId) {
+      setCurrentUser((prev) => (prev ? { ...prev, ...updates } : null));
+    }
+  };
+
+  const login = (username: string, password?: string): { success: boolean; message?: string } => {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password?.trim();
+
+    const user = users.find(
+      (u) => u.username.toLowerCase() === cleanUser || u.email?.toLowerCase() === cleanUser
+    );
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'Usuário ou e-mail não encontrado no sistema. Verifique a digitação.',
+      };
+    }
+
+    if (user.password && cleanPass !== user.password) {
+      return {
+        success: false,
+        message: 'Senha incorreta para este usuário.',
+      };
+    }
+
+    setCurrentUser(user);
+    return { success: true };
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem(STORAGE_KEY_USER);
+  };
+
+  // Filter logic
   const filteredRecords = useMemo(() => {
-    return records.filter((rec) => {
-      // Date or Period or Month filter
+    return records.filter((r) => {
       if (filters.viewMode === 'daily') {
-        if (filters.date && rec.date !== filters.date) return false;
+        if (r.date !== filters.date) return false;
       } else if (filters.viewMode === 'period') {
-        if (filters.startDate && rec.date < filters.startDate) return false;
-        if (filters.endDate && rec.date > filters.endDate) return false;
+        if (filters.startDate && r.date < filters.startDate) return false;
+        if (filters.endDate && r.date > filters.endDate) return false;
       } else if (filters.viewMode === 'accumulated') {
-        if (filters.month && !rec.date.startsWith(filters.month)) return false;
+        if (!r.date.startsWith(filters.month)) return false;
       }
 
-      // Cut Type filter
-      if (filters.type !== 'ALL' && rec.type !== filters.type) return false;
-
-      // Shift filter
-      if (filters.shift !== 'ALL' && rec.shift !== filters.shift) return false;
-
-      // Operator filter
-      if (filters.operator !== 'ALL' && rec.responsibleOperator !== filters.operator) return false;
+      if (filters.type !== 'ALL' && r.type !== filters.type) return false;
+      if (filters.shift !== 'ALL' && r.shift !== filters.shift) return false;
+      if (filters.operator !== 'ALL' && r.responsibleOperator !== filters.operator) return false;
 
       return true;
     });
   }, [records, filters]);
 
-  // Calculate summary of filtered records
   const summary = useMemo(() => {
     return calculateSummary(filteredRecords);
   }, [filteredRecords]);
 
-  // Permission helpers
-  const isAdmin = currentUser.role === 'ADMIN';
-  const canUpload = currentUser.role === 'ADMIN' || currentUser.role === 'GERENCIAL';
-  const canEdit = currentUser.role === 'ADMIN' || currentUser.role === 'GERENCIAL';
-
+  // Record CRUD
   const addRecord = (newRec: ProductionRecord) => {
-    setRecords((prev) => [newRec, ...prev]);
-    // Automatically switch the active daily filter to the newly uploaded record's date!
+    setRecords((prev) => {
+      const idx = prev.findIndex((r) => r.id === newRec.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = newRec;
+        return copy;
+      }
+      return [newRec, ...prev];
+    });
+
     setFilters((prev) => ({
       ...prev,
-      viewMode: 'daily',
       date: newRec.date,
-      endDate: !prev.endDate || newRec.date > prev.endDate ? newRec.date : prev.endDate,
-      startDate: !prev.startDate || newRec.date < prev.startDate ? newRec.date : prev.startDate,
-      month: newRec.date.substring(0, 7),
+      viewMode: 'daily',
     }));
-  };
-
-  const updateRecord = (updated: ProductionRecord) => {
-    setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
   };
 
   const deleteRecord = (id: string) => {
     setRecords((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const updateRecord = (record: ProductionRecord) => {
+    setRecords((prev) => prev.map((r) => (r.id === record.id ? record : r)));
   };
 
   const correctRecordDetails = (
@@ -249,54 +330,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       carcassCostPerKg?: number;
       date?: string;
       notes?: string;
-      preDebonedInputKg?: number;
     }
   ) => {
     setRecords((prev) =>
       prev.map((r) => {
         if (r.id !== id) return r;
-
-        const responsibleOperator = updates.responsibleOperator ?? r.responsibleOperator;
-        const operatorCount = updates.operatorCount ?? r.operatorCount;
-        const shift = updates.shift ?? r.shift;
-        const date = updates.date ?? r.date;
-        const notes = updates.notes !== undefined ? updates.notes : r.notes;
-        const carcassCostPerKg = updates.carcassCostPerKg ?? r.carcassCostPerKg;
-
-        const totalCarcassCost = r.rawMaterialWeightKg * carcassCostPerKg;
-        const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
+        const newCostPerKg = updates.carcassCostPerKg ?? r.carcassCostPerKg;
+        const newOperatorCount = updates.operatorCount ?? r.operatorCount;
+        const newTotalCarcassCost = r.rawMaterialWeightKg * newCostPerKg;
+        const grossProfitValue = r.finishedProductTotalValue - newTotalCarcassCost;
         const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
-        const productivityKgPerPerson = operatorCount > 0 ? r.rawMaterialWeightKg / operatorCount : 0;
-
-        // Desossa Mista e Rendimento da Desossa
-        const preDebonedInputKg = updates.preDebonedInputKg !== undefined
-          ? Math.max(0, updates.preDebonedInputKg)
-          : (r.preDebonedInputKg ?? 0);
-        const hasPreDebonedInput = preDebonedInputKg > 0;
-        const deboningEffectiveMeatKg = Math.max(0, r.saleableCutsWeightKg - preDebonedInputKg);
-        const totalCarcass = (r.saleableCutsWeightKg + r.boneWeightKg + r.fatWeightKg + r.lossKg) || r.rawMaterialWeightKg;
-        const carcassWithBoneWeightKg = Math.max(0, totalCarcass - preDebonedInputKg);
-        const deboningYieldNetPct = carcassWithBoneWeightKg > 0
-          ? (deboningEffectiveMeatKg / carcassWithBoneWeightKg) * 100
-          : 0;
+        const productivityKgPerPerson = newOperatorCount > 0 ? r.rawMaterialWeightKg / newOperatorCount : r.productivityKgPerPerson;
 
         return {
           ...r,
-          responsibleOperator,
-          operatorCount,
-          shift,
-          date,
-          notes,
-          carcassCostPerKg,
-          totalCarcassCost,
+          ...updates,
+          carcassCostPerKg: newCostPerKg,
+          totalCarcassCost: newTotalCarcassCost,
+          operatorCount: newOperatorCount,
           grossProfitValue,
           profitMarginPct,
           productivityKgPerPerson,
-          preDebonedInputKg,
-          hasPreDebonedInput,
-          deboningEffectiveMeatKg,
-          carcassWithBoneWeightKg,
-          deboningYieldNetPct,
         };
       })
     );
@@ -308,13 +362,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const mergeRecords = (newRecords: ProductionRecord[]) => {
     setRecords((prev) => {
-      const existingIds = new Set(prev.map((r) => r.id));
-      const toAdd = newRecords.filter((r) => !existingIds.has(r.id));
-      const updated = prev.map((old) => {
-        const replacement = newRecords.find((r) => r.id === old.id);
-        return replacement || old;
-      });
-      return [...toAdd, ...updated];
+      const map = new Map(prev.map((r) => [r.id, r]));
+      newRecords.forEach((nr) => map.set(nr.id, nr));
+      return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
     });
   };
 
@@ -327,19 +377,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO', newCost: number) => {
     setRecords((prev) =>
       prev.map((r) => {
-        if (r.type === type) {
-          const totalCarcassCost = r.rawMaterialWeightKg * newCost;
-          const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
-          const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
-          return {
-            ...r,
-            carcassCostPerKg: newCost,
-            totalCarcassCost,
-            grossProfitValue,
-            profitMarginPct,
-          };
-        }
-        return r;
+        if (r.type !== type) return r;
+        const newTotalCost = r.rawMaterialWeightKg * newCost;
+        const grossProfitValue = r.finishedProductTotalValue - newTotalCost;
+        const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
+        return {
+          ...r,
+          carcassCostPerKg: newCost,
+          totalCarcassCost: newTotalCost,
+          grossProfitValue,
+          profitMarginPct,
+        };
       })
     );
   };
@@ -347,8 +395,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetToDemoData = () => {
     setRecords(INITIAL_PRODUCTION_RECORDS);
     setBenchmarks(INITIAL_MARKET_BENCHMARKS);
+    setUsers(INITIAL_USERS);
     localStorage.removeItem(STORAGE_KEY_RECORDS);
     localStorage.removeItem(STORAGE_KEY_BENCHMARKS);
+    localStorage.removeItem(STORAGE_KEY_USERS);
     const initialDate = INITIAL_PRODUCTION_RECORDS[0]?.date || '2026-08-28';
     const dates = INITIAL_PRODUCTION_RECORDS.map((r) => r.date).sort();
     setFilters({
@@ -363,29 +413,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const login = (username: string, password?: string): boolean => {
-    const user = INITIAL_USERS.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase() && (!password || !u.password || u.password === password)
-    );
-    if (user) {
-      setCurrentUser(user);
-      return true;
-    }
-    return false;
+  // Supabase sync methods
+  const syncSupabase = async () => {
+    const res = await syncRecordsToSupabase(records);
+    await syncUsersToSupabase(users);
+    return res;
   };
 
-  const logout = () => {
-    // Default back to Diretoria (read-only view) or first user
-    const defaultUser = INITIAL_USERS.find((u) => u.role === 'DIRETORIA') || INITIAL_USERS[0];
-    setCurrentUser(defaultUser);
+  const fetchSupabase = async () => {
+    const res = await fetchRecordsFromSupabase();
+    if (res.success && res.data && res.data.length > 0) {
+      setRecords(res.data);
+    }
+    return {
+      success: res.success,
+      message: res.message,
+    };
   };
+
+  // Permission flags based on user role
+  const isAdmin = currentUser?.role === 'ADMIN';
+  const canUpload = currentUser?.role === 'ADMIN' || currentUser?.role === 'GERENCIAL';
+  const canEdit = currentUser?.role === 'ADMIN' || currentUser?.role === 'GERENCIAL';
+  const isDirectoria = currentUser?.role === 'DIRETORIA';
 
   return (
     <AppContext.Provider
       value={{
         currentUser,
         setCurrentUser,
-        users: INITIAL_USERS,
+        users,
+        addUser,
+        removeUser,
+        updateUser,
         records,
         filteredRecords,
         summary,
@@ -399,8 +459,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         correctRecordDetails,
         replaceRecords,
         mergeRecords,
-        intranetDrivePath,
-        setIntranetDrivePath,
         lastExportDate,
         setLastExportDate,
         updateBenchmark,
@@ -411,6 +469,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         canEdit,
         canUpload,
         isAdmin,
+        isDirectoria,
+        syncSupabase,
+        fetchSupabase,
       }}
     >
       {children}
