@@ -52,7 +52,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
         const matchesDate = rec.date.includes(query);
         const matchesLeader = rec.responsibleOperator.toLowerCase().includes(query);
         const matchesId = rec.id.toLowerCase().includes(query);
-        const matchesType = (rec.type === 'DIANTEIRO' ? 'dianteiro dt' : 'traseiro tr').includes(query);
+        const matchesType = (rec.type === 'DIANTEIRO' ? 'dianteiro dt' : rec.type === 'SUINO' ? 'suino ds suíno' : 'traseiro tr').includes(query);
         if (!matchesDate && !matchesLeader && !matchesId && !matchesType) return false;
       }
       return true;
@@ -128,6 +128,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
               <option value="ALL">Todos os Cortes</option>
               <option value="DIANTEIRO">Dianteiro (DT)</option>
               <option value="TRASEIRO">Traseiro (TR)</option>
+              <option value="SUINO">Suíno (DS)</option>
             </select>
           </div>
 
@@ -194,6 +195,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredList.map((rec) => {
                   const isDT = rec.type === 'DIANTEIRO';
+                  const isSU = rec.type === 'SUINO';
                   return (
                     <tr key={rec.id} className="hover:bg-slate-50/90 transition-colors">
                       {/* Data / Turno */}
@@ -208,11 +210,13 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
                             isDT
                               ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : isSU
+                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
                               : 'bg-rose-50 text-rose-900 border-rose-200'
                           }`}
                         >
                           <Beef className="w-3 h-3" />
-                          {isDT ? 'DT (Dianteiro)' : 'TR (Traseiro)'}
+                          {isDT ? 'DT (Dianteiro)' : isSU ? 'DS (Suíno)' : 'TR (Traseiro)'}
                         </span>
                         <div className="text-[9px] text-slate-400 font-mono mt-0.5">
                           {rec.cuts.length} cortes

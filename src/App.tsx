@@ -10,6 +10,7 @@ import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { DianteiroView } from './components/DianteiroView';
 import { TraseiroView } from './components/TraseiroView';
+import { SuinoView } from './components/SuinoView';
 import { UploadView } from './components/UploadView';
 import { OnePageReport } from './components/OnePageReport';
 import { SettingsView } from './components/SettingsView';
@@ -88,12 +89,15 @@ const MainLayout: React.FC = () => {
               onNavigateToOnePage={() => setCurrentTab('report')}
               onNavigateToDianteiro={() => setCurrentTab('dianteiro')}
               onNavigateToTraseiro={() => setCurrentTab('traseiro')}
+              onNavigateToSuino={() => setCurrentTab('suino')}
             />
           )}
 
           {currentTab === 'dianteiro' && <DianteiroView />}
 
           {currentTab === 'traseiro' && <TraseiroView />}
+
+          {currentTab === 'suino' && <SuinoView />}
 
           {currentTab === 'upload' && (
             <UploadView onSuccessUpload={handleSuccessUpload} />

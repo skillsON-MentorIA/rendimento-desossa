@@ -53,8 +53,8 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     selectedRecordId || filteredRecords[0]?.id || records[0]?.id || ''
   );
 
-  // Managerial Type Filter for One Page Report (DT vs TR vs ALL)
-  const [reportTypeFilter, setReportTypeFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO'>(() => {
+  // Managerial Type Filter for One Page Report (DT vs TR vs DS vs ALL)
+  const [reportTypeFilter, setReportTypeFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO'>(() => {
     return filters.type !== 'ALL' ? filters.type : 'ALL';
   });
 
@@ -100,8 +100,8 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     return dateObj.toLocaleString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
   }, [activeMonth]);
 
-  // Handle line type filter change (DT vs TR vs ALL)
-  const handleFilterTypeChange = (type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO') => {
+  // Handle line type filter change (DT vs TR vs DS vs ALL)
+  const handleFilterTypeChange = (type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO') => {
     setReportTypeFilter(type);
     if (type === 'ALL') return;
 
@@ -302,6 +302,22 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 {records.filter(r => r.type === 'TRASEIRO').length}
               </span>
             </button>
+            <button
+              type="button"
+              id="btn-report-filter-ds"
+              onClick={() => handleFilterTypeChange('SUINO')}
+              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                reportTypeFilter === 'SUINO'
+                  ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                  : 'text-slate-700 hover:text-emerald-800'
+              }`}
+            >
+              <Beef className="w-3.5 h-3.5" />
+              Suíno (DS)
+              <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'SUINO' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-900'}`}>
+                {records.filter(r => r.type === 'SUINO').length}
+              </span>
+            </button>
           </div>
 
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
@@ -314,7 +330,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             >
               {availableRecords.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
+                  {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : r.type === 'SUINO' ? 'DS' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
                 </option>
               ))}
             </select>
@@ -447,10 +463,16 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 <span className={`inline-flex items-center gap-1 font-black uppercase text-[10px] px-1.5 py-0.5 rounded border ${
                   activeRecord.type === 'DIANTEIRO'
                     ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : activeRecord.type === 'SUINO'
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
                     : 'bg-rose-100 text-rose-900 border-rose-300'
                 }`}>
                   <Beef className="w-3 h-3" />
-                  {activeRecord.type === 'DIANTEIRO' ? 'Dianteiro (DT)' : 'Traseiro (TR)'}
+                  {activeRecord.type === 'DIANTEIRO'
+                    ? 'Dianteiro (DT)'
+                    : activeRecord.type === 'SUINO'
+                    ? 'Suíno (DS)'
+                    : 'Traseiro (TR)'}
                 </span>
               </div>
               <div>

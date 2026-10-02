@@ -109,6 +109,14 @@ export function findBenchmarkForCut(
       regex: /RECORTE|NERVO|GORDURA|DESCARTE|RETALHO/i,
       matcher: (b) => /RECORTE/i.test(b.name) || /RECORTE/i.test(b.code)
     },
+    // Suíno (DS)
+    { regex: /PERNIL/i, matcher: (b) => /PERNIL/i.test(b.name) || /PERNIL/i.test(b.code) },
+    { regex: /LOMBO/i, matcher: (b) => /LOMBO/i.test(b.name) || /LOMBO/i.test(b.code) },
+    { regex: /COSTELA|COSTELINHA/i, matcher: (b) => /COSTELA/i.test(b.name) || /COSTELA/i.test(b.code) },
+    { regex: /BARRIGA|PANCETA/i, matcher: (b) => /BARRIGA|PANCETA/i.test(b.name) || /BARRIGA/i.test(b.code) },
+    { regex: /BISTECA|CARRE/i, matcher: (b) => /BISTECA|CARRE/i.test(b.name) || /BISTECA/i.test(b.code) },
+    { regex: /PAPADA/i, matcher: (b) => /PAPADA/i.test(b.name) || /PAPADA/i.test(b.code) },
+    { regex: /TOUCINHO|BANHA/i, matcher: (b) => /TOUCINHO|BANHA/i.test(b.name) || /TOUCINHO/i.test(b.code) },
   ];
 
   for (const rule of rules) {

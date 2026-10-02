@@ -51,7 +51,7 @@ interface AppContextType {
   lastExportDate: string | null;
   setLastExportDate: (date: string | null) => void;
   updateBenchmark: (code: string, newExpectedPct: number) => void;
-  updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO', newCost: number) => void;
+  updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => void;
   resetToDemoData: () => void;
   login: (username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
@@ -492,7 +492,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO', newCost: number) => {
+  const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => {
     setRecords((prev) =>
       prev.map((r) => {
         if (r.type !== type) return r;

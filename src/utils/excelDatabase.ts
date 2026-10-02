@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { CutItem, MarketBenchmark, ProductionRecord } from '../types';
+import { CutItem, CutType, MarketBenchmark, ProductionRecord } from '../types';
 
 export interface ExcelImportResult {
   success: boolean;
@@ -29,7 +29,7 @@ export function exportMasterDatabaseToExcel(
     'Empresa Frigorífico': r.companyName || 'FRIGORÍFICO INDUSTRIAL',
     'Horário Emissão SisAtak': r.emissionTime || '00:00',
     'Cód. Matéria-Prima': r.rawMaterialCode || '001',
-    'Desc. Matéria-Prima': r.rawMaterialDesc || (r.type === 'DIANTEIRO' ? 'DIANTEIRO BOVINO C/ OSSO' : 'TRASEIRO BOVINO C/ OSSO'),
+    'Desc. Matéria-Prima': r.rawMaterialDesc || (r.type === 'DIANTEIRO' ? 'DIANTEIRO BOVINO C/ OSSO' : r.type === 'SUINO' ? 'CARCAÇA SUÍNA C/ OSSO' : 'TRASEIRO BOVINO C/ OSSO'),
     'Matéria-Prima (Kg)': Number(r.rawMaterialWeightKg.toFixed(2)),
     'Caixas MP': r.rawMaterialBoxes || 0,
     'Produto Acabado (Kg)': Number(r.finishedProductWeightKg.toFixed(2)),
@@ -285,7 +285,10 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
           const id = String(row['ID Sistema'] || row['id'] || `REC-IMPORT-${Date.now()}-${idx}`);
           const date = String(row['Data'] || new Date().toISOString().split('T')[0]);
           const shift = (row['Turno'] || 'Turno 1') as 'Turno 1' | 'Turno 2' | 'Turno 3';
-          const type = (String(row['Tipo'] || '').includes('TR') ? 'TRASEIRO' : 'DIANTEIRO') as 'DIANTEIRO' | 'TRASEIRO';
+          const rawTypeStr = String(row['Tipo'] || '').toUpperCase();
+          const type: CutType = (rawTypeStr.includes('SU') || rawTypeStr.includes('DS'))
+            ? 'SUINO'
+            : (rawTypeStr.includes('TR') ? 'TRASEIRO' : 'DIANTEIRO');
           const responsibleOperator = String(row['Líder de Desossa'] || row['Lider'] || 'Encarregado');
           const operatorCount = Number(row['Operadores (Pessoas)'] || row['Operadores'] || 20);
           const rawMaterialWeightKg = Number(row['Matéria-Prima (Kg)'] || row['MP'] || 0);
@@ -313,7 +316,7 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
           const deboningYieldNetPct = totalCarcass > 0 ? (saleableCutsWeightKg / totalCarcass) * 100 : 0;
           const totalYieldPct = rawMaterialWeightKg > 0 ? (finishedProductWeightKg / rawMaterialWeightKg) * 100 : 0;
 
-          const carcassCostPerKg = Number(row['Custo Carcaça (R$/Kg)'] || (type === 'TRASEIRO' ? 21.80 : 15.20));
+          const carcassCostPerKg = Number(row['Custo Carcaça (R$/Kg)'] || (type === 'TRASEIRO' ? 21.80 : type === 'SUINO' ? 11.50 : 15.20));
           const totalCarcassCost = Number(row['Custo Total Carcaça (R$)'] || (rawMaterialWeightKg * carcassCostPerKg));
           const finishedProductTotalValue = Number(row['Faturamento PA (R$)'] || cuts.reduce((acc, c) => acc + c.totalPrice, 0));
           const grossProfitValue = Number(row['Lucro Bruto (R$)'] || (finishedProductTotalValue - totalCarcassCost));

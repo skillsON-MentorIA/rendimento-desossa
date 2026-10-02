@@ -42,20 +42,24 @@ export function parseSisAtakReport(
 ): ProductionRecord {
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  // 1. Detect Cut Type (TRASEIRO vs DIANTEIRO)
+  // 1. Detect Cut Type (TRASEIRO vs DIANTEIRO vs SUINO)
   let type: CutType = 'TRASEIRO';
   if (extraParams.type) {
     type = extraParams.type;
   } else {
-    const traseiroHits = (rawText.match(/TRASEIRO|TR\s*-\s*TRASEIRO|1110001|Total:\s*TR/gi) || []).length;
+    const suinoHits = (rawText.match(/SU[IÍ]NO|DS\s*-\s*SU[IÍ]NO|1110003|Total:\s*DS|CARCA[ÇC]A\s+SU[IÍ]NA|PERNIL|PALETA\s+SU|LOMBO|BISTECA|PANCETA|COSTELINHA/gi) || []).length;
     const dianteiroHits = (rawText.match(/DIANTEIRO|DT\s*-\s*DIANTEIRO|1110002|Total:\s*DT/gi) || []).length;
-    if (dianteiroHits > traseiroHits) {
+    const traseiroHits = (rawText.match(/TRASEIRO|TR\s*-\s*TRASEIRO|1110001|Total:\s*TR/gi) || []).length;
+    if (suinoHits > dianteiroHits && suinoHits > traseiroHits) {
+      type = 'SUINO';
+    } else if (dianteiroHits > traseiroHits) {
       type = 'DIANTEIRO';
     } else {
       type = 'TRASEIRO';
     }
   }
   const isTraseiro = type === 'TRASEIRO';
+  const isSuino = type === 'SUINO';
 
   // 2. Detect Dates & Header
   // Conforme requisito: O campo correto onde a DATA deve ser coletada é no final do relatório do ATAK onde aparece com o nome PERÍODO:
@@ -135,8 +139,8 @@ export function parseSisAtakReport(
     }
   }
 
-  // Pattern: (TR - TRASEIRO | DT - DIANTEIRO) 16.124,400 15.895,695 98,58 % 0,00 448.200,04
-  const resumoGrupoMatch = rawText.match(/(?:TR|DT)\s*-\s*(?:TRASEIRO|DIANTEIRO)\s+([^\n\r]+)/i);
+  // Pattern: (TR - TRASEIRO | DT - DIANTEIRO | DS - SUÍNO) 16.124,400 15.895,695 98,58 % 0,00 448.200,04
+  const resumoGrupoMatch = rawText.match(/(?:TR|DT|DS)\s*-\s*(?:TRASEIRO|DIANTEIRO|SU[IÍ]NO)\s+([^\n\r]+)/i);
   if (resumoGrupoMatch) {
     const nums = [...resumoGrupoMatch[1].matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,4})/g)].map((x) => parseBrNumber(x[1]));
     if (nums.length >= 2) {
@@ -148,8 +152,8 @@ export function parseSisAtakReport(
     }
   }
 
-  // Pattern: Total: TR 15.895,695 493,000 98,58 % 28,20 448.200,04
-  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT)\s+([^\n\r]+)/i);
+  // Pattern: Total: TR / DT / DS 15.895,695 493,000 98,58 % 28,20 448.200,04
+  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT|DS)\s+([^\n\r]+)/i);
   if (totalCutsRowMatch) {
     const nums = [...totalCutsRowMatch[1].matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,4})/g)].map((x) => parseBrNumber(x[1]));
     if (nums.length >= 2) {
@@ -173,8 +177,8 @@ export function parseSisAtakReport(
   // 4. Raw Material Line in Table
   let rawMaterialWeightKg = mpFromSummary;
   let rawMaterialBoxes = 0;
-  let rawMaterialCode = isTraseiro ? '1110001-0' : '1110002-0';
-  let rawMaterialDesc = isTraseiro ? 'TRASEIRO BOVINO C/ OSSO' : 'DIANTEIRO BOVINO C/ OSSO';
+  let rawMaterialCode = isSuino ? '1110003-0' : isTraseiro ? '1110001-0' : '1110002-0';
+  let rawMaterialDesc = isSuino ? 'CARCAÇA SUÍNA C/ OSSO' : isTraseiro ? 'TRASEIRO BOVINO C/ OSSO' : 'DIANTEIRO BOVINO C/ OSSO';
   let detectedPreDebonedKg = 0;
   const hasPaHeader = /PRODUTO\s+ACABADO/i.test(rawText);
 
@@ -191,7 +195,7 @@ export function parseSisAtakReport(
     // Detecção de carnes que já entraram desossadas no cabeçalho/matéria-prima
     if (inRawMaterialSection || (!hasPaHeader && !/^Total:/i.test(line))) {
       const isPreDebonedText = /S\/\s*OSSO|SEM\s*OSSO|DESOSSAD|DESOSSADO|CARNE\s+DESOSSADA/i.test(line);
-      const isBoneIn = /C\/\s*OSSO|COM\s*OSSO|BOVINO\s+C\//i.test(line);
+      const isBoneIn = /C\/\s*OSSO|COM\s*OSSO|BOVINO\s+C\/|SU[IÍ]NO\s+C\//i.test(line);
       if (isPreDebonedText && !isBoneIn) {
         const matchKg = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*KG/i);
         if (matchKg) {
@@ -200,7 +204,7 @@ export function parseSisAtakReport(
       }
     }
 
-    if (/BOVINO C\/\s*OSSO/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[12]/i.test(line)) {
+    if (/BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[123]/i.test(line)) {
       const matchKg = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*KG/i);
       const matchCx = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*CX/i);
       if (matchKg && rawMaterialWeightKg === 0) {
@@ -213,7 +217,7 @@ export function parseSisAtakReport(
       if (codeM) rawMaterialCode = codeM[1];
     }
 
-    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT)/i.test(line)) {
+    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT|DS)/i.test(line)) {
       const nums = [...line.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,3})/g)].map((x) => parseBrNumber(x[1]));
       if (nums.length >= 1 && rawMaterialWeightKg === 0) {
         rawMaterialWeightKg = nums[0];
@@ -236,7 +240,7 @@ export function parseSisAtakReport(
       inProdutoAcabado = true;
       continue;
     }
-    if (/^Total:\s*(?:TR|DT)/i.test(line) || /^RESUMO/i.test(line) || /^TOTALIZA[ÇC][ÃA]O/i.test(line) || /Filtros\s+Utilizados/i.test(line)) {
+    if (/^Total:\s*(?:TR|DT|DS)/i.test(line) || /^RESUMO/i.test(line) || /^TOTALIZA[ÇC][ÃA]O/i.test(line) || /Filtros\s+Utilizados/i.test(line)) {
       inProdutoAcabado = false;
       continue;
     }
@@ -255,7 +259,7 @@ export function parseSisAtakReport(
     const rest = codeMatch[2];
 
     // Explicitly prevent raw material from being recorded as a finished cut
-    if (code === rawMaterialCode || /BOVINO C\/\s*OSSO/i.test(rest) || /MAT[ÉE]RIA.PRIMA/i.test(rest)) {
+    if (code === rawMaterialCode || /BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(rest) || /MAT[ÉE]RIA.PRIMA/i.test(rest)) {
       continue;
     }
 
@@ -285,12 +289,16 @@ export function parseSisAtakReport(
       }
 
       const isBone = /OSSO/i.test(name);
-      const isFat = /SEBO/i.test(name);
+      const isFat = /SEBO|TOUCINHO|BANHA/i.test(name);
       const isNonSaleable = isBone || isFat;
 
       let category: CutItem['category'] = 'RECORTE';
       if (isBone) category = 'SUBPRODUTO_OSSO';
       else if (isFat) category = 'SUBPRODUTO_SEBO';
+      else if (type === 'SUINO') {
+        if (/RECORTE|RETALHO|MOIDA/i.test(name)) category = 'RECORTE';
+        else category = 'SUINO';
+      }
       else if (/PICANHA|FIL[ÉE]\s*MIGNON|CONTRA\s*FIL[ÉE]|ALCATRA|CORA[ÇC][ÃA]O|MAMINHA/i.test(name)) category = 'NOBRE';
       else if (/RECORTE|BANANINHA|NERVO|DESCARTE|MO[ÍI]DA/i.test(name)) category = 'RECORTE';
       else if (type === 'DIANTEIRO') category = 'DIANTEIRO';
@@ -357,8 +365,16 @@ export function parseSisAtakReport(
   // If cuts were not present in report (e.g. only summary was uploaded)
   // use industry standard proportions for display until full cuts are provided
   if (cuts.length === 0 && rawMaterialWeightKg > 0) {
-    boneWeightKg = isTraseiro ? rawMaterialWeightKg * 0.2055 : rawMaterialWeightKg * 0.2116;
-    fatWeightKg = isTraseiro ? rawMaterialWeightKg * 0.0220 : rawMaterialWeightKg * 0.0081;
+    boneWeightKg = isSuino
+      ? rawMaterialWeightKg * 0.0350
+      : isTraseiro
+      ? rawMaterialWeightKg * 0.2055
+      : rawMaterialWeightKg * 0.2116;
+    fatWeightKg = isSuino
+      ? rawMaterialWeightKg * 0.0450
+      : isTraseiro
+      ? rawMaterialWeightKg * 0.0220
+      : rawMaterialWeightKg * 0.0081;
   }
 
   const nonSaleableWeightKg = boneWeightKg + fatWeightKg;
@@ -392,15 +408,15 @@ export function parseSisAtakReport(
   const totalYieldPct = totalCarcassWeightKg > 0 ? (finishedProductWeightKg / totalCarcassWeightKg) * 100 : 0;
 
   // 9. Financials & Costs
-  const carcassCostPerKg = extraParams.carcassCostPerKg ?? (type === 'TRASEIRO' ? 21.80 : 15.20);
+  const carcassCostPerKg = extraParams.carcassCostPerKg ?? (type === 'SUINO' ? 11.50 : type === 'TRASEIRO' ? 21.80 : 15.20);
   const totalCarcassCost = rawMaterialWeightKg * carcassCostPerKg;
   const grossProfitValue = finishedProductTotalValue - totalCarcassCost;
   const profitMarginPct = finishedProductTotalValue > 0 ? (grossProfitValue / finishedProductTotalValue) * 100 : 0;
 
   // 10. Operational Team & Productivity
-  const operatorCount = extraParams.operatorCount ?? (type === 'TRASEIRO' ? 22 : 20);
+  const operatorCount = extraParams.operatorCount ?? (type === 'SUINO' ? 18 : type === 'TRASEIRO' ? 22 : 20);
   const shift = extraParams.shift ?? 'Turno 1';
-  const responsibleOperator = extraParams.responsibleOperator ?? (type === 'TRASEIRO' ? 'Valdemar Nogueira' : 'Marcos Silveira');
+  const responsibleOperator = extraParams.responsibleOperator ?? (type === 'SUINO' ? 'Edmar Ferreira' : type === 'TRASEIRO' ? 'Valdemar Nogueira' : 'Marcos Silveira');
   const productivityKgPerPerson = operatorCount > 0 && rawMaterialWeightKg > 0 ? rawMaterialWeightKg / operatorCount : 0;
 
   return {

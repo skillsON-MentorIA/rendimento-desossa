@@ -41,6 +41,7 @@ interface DashboardViewProps {
   onNavigateToOnePage: () => void;
   onNavigateToDianteiro: () => void;
   onNavigateToTraseiro: () => void;
+  onNavigateToSuino: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -48,6 +49,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToOnePage,
   onNavigateToDianteiro,
   onNavigateToTraseiro,
+  onNavigateToSuino,
 }) => {
   const { filteredRecords, summary, records, filters, setFilters } = useApp();
   const [weeklyMetric, setWeeklyMetric] = useState<'rendimento' | 'produtividade' | 'quebra' | 'financeiro'>('rendimento');
@@ -96,6 +98,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       custoCarcaça: number;
       dtCount: number;
       trCount: number;
+      dsCount: number;
     }> = {};
 
     sorted.forEach((r) => {
@@ -123,6 +126,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           custoCarcaça: 0,
           dtCount: 0,
           trCount: 0,
+          dsCount: 0,
         };
       }
 
@@ -135,6 +139,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       byDate[d].grossProfitValue += r.grossProfitValue;
       if (r.type === 'DIANTEIRO') byDate[d].dtCount++;
       if (r.type === 'TRASEIRO') byDate[d].trCount++;
+      if (r.type === 'SUINO') byDate[d].dsCount++;
     });
 
     return Object.values(byDate).map((item) => {
@@ -148,7 +153,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const totalYieldPct = item.rawWeightKg > 0 ? (item.finishedWeightKg / item.rawWeightKg) * 100 : 0;
       const nonSaleablePct = item.rawWeightKg > 0 ? (nonSaleableWeight / item.rawWeightKg) * 100 : 0;
       const profitMarginPct = item.faturamentoPA > 0 ? (item.grossProfitValue / item.faturamentoPA) * 100 : 0;
-      const productivityKgPerPerson = item.rawWeightKg / (item.dtCount * 20 + item.trCount * 22 || 20);
+      const totalOperators = (item.dtCount * 20 + item.trCount * 22 + item.dsCount * 18) || 20;
+      const productivityKgPerPerson = item.rawWeightKg / totalOperators;
 
       return {
         ...item,
@@ -162,11 +168,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [records]);
 
-  // Specific subsets for DT and TR dynamic comparisons
+  // Specific subsets for DT, TR and DS dynamic comparisons
   const dtRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'DIANTEIRO'), [filteredRecords]);
   const trRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'TRASEIRO'), [filteredRecords]);
+  const dsRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'SUINO'), [filteredRecords]);
   const dtSummary = useMemo(() => calculateSummary(dtRecords), [dtRecords]);
   const trSummary = useMemo(() => calculateSummary(trRecords), [trRecords]);
+  const dsSummary = useMemo(() => calculateSummary(dsRecords), [dsRecords]);
 
   // Current active period records (to detect when DT and TR occur on the same day or month)
   const periodAllRecords = useMemo(() => {
@@ -238,6 +246,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             <Beef className="w-4 h-4 text-rose-400" />
             Ver Traseiro (TR)
+          </button>
+          <button
+            onClick={onNavigateToSuino}
+            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
+          >
+            <Beef className="w-4 h-4 text-emerald-400" />
+            Ver Suíno (DS)
           </button>
           <button
             onClick={onNavigateToOnePage}
@@ -923,15 +938,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Two Columns: Segmentos Dianteiro/Traseiro & Balanço de Subprodutos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Segmentação Operacional: Dianteiro (DT) vs Traseiro (TR) */}
+        {/* Segmentação Operacional: Dianteiro (DT) vs Traseiro (TR) vs Suíno (DS) */}
         <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
             <div>
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
-                Segmentação Operacional: DT vs TR
+                Segmentação Operacional: DT vs TR vs DS
               </h3>
               <p className="text-xs text-slate-500">
-                Comparativo de rendimento e rentabilidade entre partes
+                Comparativo de rendimento e rentabilidade entre partes bovinas e suínas
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -939,32 +954,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={onNavigateToDianteiro}
                 className="text-xs text-rose-800 hover:text-rose-900 font-semibold flex items-center gap-1"
               >
-                Detalhes DT <ArrowUpRight className="w-3.5 h-3.5" />
+                DT <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={onNavigateToTraseiro}
-                className="text-xs text-rose-800 hover:text-rose-900 font-semibold flex items-center gap-1 ml-2"
+                className="text-xs text-rose-800 hover:text-rose-900 font-semibold flex items-center gap-1 ml-1"
               >
-                Detalhes TR <ArrowUpRight className="w-3.5 h-3.5" />
+                TR <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onNavigateToSuino}
+                className="text-xs text-emerald-800 hover:text-emerald-900 font-semibold flex items-center gap-1 ml-1"
+              >
+                DS <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Box Dianteiro */}
             <div className="p-3.5 rounded-lg bg-amber-50/60 border border-amber-200/70">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
                   <Beef className="w-4 h-4 text-amber-700" />
-                  Dianteiro Bovino (DT)
+                  Dianteiro (DT)
                 </span>
                 <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-bold">
-                  Acém / Paleta
+                  Bovino
                 </span>
               </div>
               <div className="mt-2 space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Rend. Desossa (Carnes/Carc.):</span>
+                  <span className="text-slate-500">Rend. Desossa:</span>
                   <span className="font-bold text-slate-900">{formatPct(dtSummary.avgDeboningYieldNetPct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -974,11 +995,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Subprodutos (Osso+Sebo):</span>
+                  <span className="text-slate-500">Subprodutos:</span>
                   <span className="font-semibold text-slate-800">{formatPct(dtSummary.avgNonSaleablePct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Margem Operacional:</span>
+                  <span className="text-slate-500">Margem Oper.:</span>
                   <span className={`font-bold ${dtSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(dtSummary.avgProfitMarginPct, 2)}</span>
                 </div>
               </div>
@@ -989,15 +1010,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
                   <Beef className="w-4 h-4 text-rose-700" />
-                  Traseiro Bovino (TR)
+                  Traseiro (TR)
                 </span>
                 <span className="text-[10px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-bold">
-                  Picanha / Contra
+                  Bovino
                 </span>
               </div>
               <div className="mt-2 space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Rend. Desossa (Carnes/Carc.):</span>
+                  <span className="text-slate-500">Rend. Desossa:</span>
                   <span className="font-bold text-slate-900">{formatPct(trSummary.avgDeboningYieldNetPct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1007,12 +1028,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Subprodutos (Osso+Sebo):</span>
+                  <span className="text-slate-500">Subprodutos:</span>
                   <span className="font-semibold text-slate-800">{formatPct(trSummary.avgNonSaleablePct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Margem Operacional:</span>
+                  <span className="text-slate-500">Margem Oper.:</span>
                   <span className={`font-bold ${trSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(trSummary.avgProfitMarginPct, 2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Box Suíno */}
+            <div className="p-3.5 rounded-lg bg-emerald-50/60 border border-emerald-200/70">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                  <Beef className="w-4 h-4 text-emerald-700" />
+                  Suíno (DS)
+                </span>
+                <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-bold">
+                  Carcaça
+                </span>
+              </div>
+              <div className="mt-2 space-y-1.5 text-xs text-slate-700">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Rend. Desossa:</span>
+                  <span className="font-bold text-slate-900">{formatPct(dsSummary.avgDeboningYieldNetPct, 2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Quebra Média:</span>
+                  <span className={`font-semibold ${dsSummary.avgLossPct <= TARGET_LOSS_MAX ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {formatPct(dsSummary.avgLossPct, 2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Subprodutos:</span>
+                  <span className="font-semibold text-slate-800">{formatPct(dsSummary.avgNonSaleablePct, 2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Margem Oper.:</span>
+                  <span className={`font-bold ${dsSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(dsSummary.avgProfitMarginPct, 2)}</span>
                 </div>
               </div>
             </div>

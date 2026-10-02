@@ -11,7 +11,7 @@ export interface User {
   shift?: string;
 }
 
-export type CutType = 'DIANTEIRO' | 'TRASEIRO';
+export type CutType = 'DIANTEIRO' | 'TRASEIRO' | 'SUINO';
 
 export interface CutItem {
   id: string;
@@ -24,14 +24,14 @@ export interface CutItem {
   yieldActualPct: number; // Rendimento Apurado %
   yieldExpectedPct: number; // Rendimento Padrão Mercado %
   isNonSaleable?: boolean; // Sebo ou Osso
-  category: 'NOBRE' | 'DIANTEIRO' | 'TRASEIRO' | 'SUBPRODUTO_OSSO' | 'SUBPRODUTO_SEBO' | 'RECORTE';
+  category: 'NOBRE' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'SUBPRODUTO_OSSO' | 'SUBPRODUTO_SEBO' | 'RECORTE';
 }
 
 export interface OperatorStat {
   operatorId: string;
   name: string;
   shift: 'Turno 1' | 'Turno 2' | 'Turno 3';
-  station: 'Desossa DT' | 'Desossa TR' | 'Refile/Toalete' | 'Embalagem' | 'Geral';
+  station: 'Desossa DT' | 'Desossa TR' | 'Desossa DS' | 'Refile/Toalete' | 'Embalagem' | 'Geral';
   kgProcessed: number;
   hoursWorked: number;
   productivityKgPerPerson: number; // kg / pessoa
@@ -116,7 +116,7 @@ export interface FilterState {
   startDate?: string; // YYYY-MM-DD
   endDate?: string; // YYYY-MM-DD
   month: string; // YYYY-MM
-  type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO';
+  type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO';
   shift: 'ALL' | 'Turno 1' | 'Turno 2' | 'Turno 3';
   operator: 'ALL' | string;
 }

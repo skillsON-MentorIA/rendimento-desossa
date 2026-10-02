@@ -108,8 +108,14 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
                 <h3 className="text-base font-bold tracking-tight">
                   Corrigir Informações do Lote
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-900 text-rose-200 border border-rose-700">
-                  {record.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : 'TR - TRASEIRO'}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                  record.type === 'DIANTEIRO'
+                    ? 'bg-amber-900 text-amber-200 border-amber-700'
+                    : record.type === 'SUINO'
+                    ? 'bg-emerald-900 text-emerald-200 border-emerald-700'
+                    : 'bg-rose-900 text-rose-200 border-rose-700'
+                }`}>
+                  {record.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : record.type === 'SUINO' ? 'DS - SUÍNO' : 'TR - TRASEIRO'}
                 </span>
               </div>
               <p className="text-xs text-slate-300">

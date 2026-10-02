@@ -129,7 +129,20 @@ export const INITIAL_MARKET_BENCHMARKS: MarketBenchmark[] = [
   { code: 'CAPA_FILE', name: 'Capa de Filé', type: 'TRASEIRO', expectedYieldPct: 1.75, standardPricePerKg: 29.00, tolerancePct: 0.3 },
   { code: 'RECORTE_TRASEIRO', name: 'Recortes / Bananinha Traseiro', type: 'TRASEIRO', expectedYieldPct: 3.50, standardPricePerKg: 13.00, tolerancePct: 0.5 },
   { code: 'OSSO_TRASEIRO', name: 'Osso do Traseiro (Subproduto)', type: 'TRASEIRO', expectedYieldPct: 19.80, standardPricePerKg: 0.77, tolerancePct: 1.5 },
-  { code: 'SEBO_TRASEIRO', name: 'Sebo do Traseiro (Subproduto)', type: 'TRASEIRO', expectedYieldPct: 2.10, standardPricePerKg: 1.40, tolerancePct: 0.4 }
+  { code: 'SEBO_TRASEIRO', name: 'Sebo do Traseiro (Subproduto)', type: 'TRASEIRO', expectedYieldPct: 2.10, standardPricePerKg: 1.40, tolerancePct: 0.4 },
+
+  // Suíno (DS)
+  { code: '02010010010-0', name: 'Pernil Suíno Desossado', type: 'SUINO', expectedYieldPct: 32.00, standardPricePerKg: 18.50, tolerancePct: 1.0 },
+  { code: '02010010020-0', name: 'Paleta Suína Desossada', type: 'SUINO', expectedYieldPct: 18.50, standardPricePerKg: 16.80, tolerancePct: 0.8 },
+  { code: '02010010030-0', name: 'Lombo Suíno Resf', type: 'SUINO', expectedYieldPct: 9.50, standardPricePerKg: 22.00, tolerancePct: 0.5 },
+  { code: '02010010040-0', name: 'Costela Suína Especial', type: 'SUINO', expectedYieldPct: 7.50, standardPricePerKg: 24.50, tolerancePct: 0.5 },
+  { code: '02010010050-0', name: 'Barriga / Panceta Suína', type: 'SUINO', expectedYieldPct: 13.00, standardPricePerKg: 21.00, tolerancePct: 0.7 },
+  { code: '02010010060-0', name: 'Bisteca / Carré Suíno', type: 'SUINO', expectedYieldPct: 7.50, standardPricePerKg: 19.50, tolerancePct: 0.5 },
+  { code: '02010010070-0', name: 'Copa Lombo / Sobrepaleta', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 22.50, tolerancePct: 0.4 },
+  { code: '02010010080-0', name: 'Filé Mignon Suíno', type: 'SUINO', expectedYieldPct: 1.80, standardPricePerKg: 25.00, tolerancePct: 0.2 },
+  { code: '02010010090-0', name: 'Recorte Suíno Industrial', type: 'SUINO', expectedYieldPct: 4.00, standardPricePerKg: 11.50, tolerancePct: 0.6 },
+  { code: '02010990020-0', name: 'Toucinho / Banha (Subproduto)', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 5.50, tolerancePct: 0.5 },
+  { code: '02010990010-0', name: 'Osso Suíno (Subproduto)', type: 'SUINO', expectedYieldPct: 3.50, standardPricePerKg: 0.80, tolerancePct: 0.5 }
 ];
 
 // Dados históricos e autênticos extraídos dos relatórios SisAtak anexados
@@ -571,6 +584,58 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
     grossProfitValue: 94236.00,
     profitMarginPct: 21.29,
     notes: 'Fechamento de produção semanal no sábado com meta alcançada.'
+  },
+
+  // 7. SUÍNO - 27/08/2026 (Quinta-feira) - Desossa Suína
+  {
+    id: 'rec_ds_20260827',
+    date: '2026-08-27',
+    periodStart: '2026-08-27',
+    periodEnd: '2026-08-27',
+    companyName: 'BH FOODS COMERCIO E INDUSTRIA LTDA',
+    emissionTime: '28/08/2026 09:30 h',
+    type: 'SUINO',
+    shift: 'Turno 1',
+    responsibleOperator: 'Edmar Ferreira (Líder Desossa DS)',
+    operatorCount: 18,
+    rawMaterialCode: '1110003-0',
+    rawMaterialDesc: 'CARCAÇA SUÍNA C/ OSSO',
+    rawMaterialWeightKg: 12850.000,
+    rawMaterialBoxes: 140,
+    rawMaterialAvgWeightKg: 91.785,
+    carcassCostPerKg: 11.50,
+    totalCarcassCost: 147775.00,
+    finishedProductWeightKg: 12659.550,
+    finishedProductBoxes: 310,
+    finishedProductTotalValue: 248596.12,
+    cuts: [
+      { id: 'rec_ds_20260827_1', code: '02010010010-0', name: 'CXGG - PERNIL SUINO DESOSSADO RESF', weightKg: 4112.000, boxesCount: 100, unitPrice: 18.50, totalPrice: 76072.00, yieldActualPct: 32.00, yieldExpectedPct: 32.00, category: 'SUINO' },
+      { id: 'rec_ds_20260827_2', code: '02010010020-0', name: 'CXGG - PALETA SUINA DESOSSADA RESF', weightKg: 2377.250, boxesCount: 60, unitPrice: 16.80, totalPrice: 39937.80, yieldActualPct: 18.50, yieldExpectedPct: 18.50, category: 'SUINO' },
+      { id: 'rec_ds_20260827_3', code: '02010010030-0', name: 'CXGG - LOMBO SUINO EXTRA RESF', weightKg: 1220.750, boxesCount: 30, unitPrice: 22.00, totalPrice: 26856.50, yieldActualPct: 9.50, yieldExpectedPct: 9.50, category: 'SUINO' },
+      { id: 'rec_ds_20260827_4', code: '02010010040-0', name: 'CXGG - COSTELA SUINA ESPECIAL RESF', weightKg: 963.750, boxesCount: 25, unitPrice: 24.50, totalPrice: 23611.88, yieldActualPct: 7.50, yieldExpectedPct: 7.50, category: 'SUINO' },
+      { id: 'rec_ds_20260827_5', code: '02010010050-0', name: 'CXGG - BARRIGA / PANCETA SUINA RESF', weightKg: 1670.500, boxesCount: 42, unitPrice: 21.00, totalPrice: 35080.50, yieldActualPct: 13.00, yieldExpectedPct: 13.00, category: 'SUINO' },
+      { id: 'rec_ds_20260827_6', code: '02010010060-0', name: 'CXGG - BISTECA / CARRE SUINO RESF', weightKg: 963.750, boxesCount: 24, unitPrice: 19.50, totalPrice: 18793.13, yieldActualPct: 7.50, yieldExpectedPct: 7.50, category: 'SUINO' },
+      { id: 'rec_ds_20260827_7', code: '02010010070-0', name: 'CXGG - COPA LOMBO / SOBREPALETA RESF', weightKg: 578.250, boxesCount: 14, unitPrice: 22.50, totalPrice: 13010.63, yieldActualPct: 4.50, yieldExpectedPct: 4.50, category: 'SUINO' },
+      { id: 'rec_ds_20260827_8', code: '02010010080-0', name: 'CXGG - FILE MIGNON SUINO RESF', weightKg: 231.300, boxesCount: 6, unitPrice: 25.00, totalPrice: 5782.50, yieldActualPct: 1.80, yieldExpectedPct: 1.80, category: 'SUINO' },
+      { id: 'rec_ds_20260827_9', code: '02010010090-0', name: 'W-MP - RECORTE SUINO INDUSTRIAL', weightKg: 514.000, boxesCount: 13, unitPrice: 11.50, totalPrice: 5911.00, yieldActualPct: 4.00, yieldExpectedPct: 4.00, category: 'RECORTE' },
+      { id: 'rec_ds_20260827_10', code: '02010990020-0', name: 'X-MP - TOUCINHO E BANHA SUINA RESF', weightKg: 578.250, boxesCount: 12, unitPrice: 5.50, totalPrice: 3180.38, yieldActualPct: 4.50, yieldExpectedPct: 4.50, isNonSaleable: true, category: 'SUBPRODUTO_SEBO' },
+      { id: 'rec_ds_20260827_11', code: '02010990010-0', name: 'X-MP - OSSO SUINO DA DESOSSA', weightKg: 449.750, boxesCount: 10, unitPrice: 0.80, totalPrice: 359.80, yieldActualPct: 3.50, yieldExpectedPct: 3.50, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' }
+    ],
+    lossKg: 190.450,
+    lossPct: 1.482,
+    saleableCutsWeightKg: 11631.550,
+    nonSaleableWeightKg: 1028.000,
+    boneWeightKg: 449.750,
+    fatWeightKg: 578.250,
+    nonSaleablePct: 8.00,
+    bonePct: 3.50,
+    fatPct: 4.50,
+    deboningYieldNetPct: (11631.550 / 12850.000) * 100, // 90.52%
+    totalYieldPct: 98.52,
+    productivityKgPerPerson: 713.89,
+    grossProfitValue: 100821.12,
+    profitMarginPct: 40.56,
+    notes: 'Primeiro lote oficial de Desossa Suína (DS) registrado no sistema.'
   }
 ];
 
@@ -660,3 +725,34 @@ TR - TRASEIRO 16.124,400 15.895,695 98,58 % 0,00 448.200,04 448.200,04 R$
 TOTALIZAÇÃO: 16.124,400 15.895,695 98,58 % 0,00 448.200,04 448.200,04
 QUEBRA: 228,705 1,4184 %
 Filtros Utilizados: Empresa: 021 Período: 28/08/2026 a 28/08/2026`;
+
+export const RAW_SAMPLE_SISATAK_DS = `SisAtak - Sistema de Administracao Integrada de Negocios
+RETQ010 - Relatório de Produção - Desossa por Data Emissão: 28/08/2026 09:30 h Página : 0001/ 0001
+BH FOODS COMERCIO E INDUSTRIA LTDA
+MATÉRIA-PRIMA
+Produto/Ref Descrição Produto Qtde UN Qtde UN Media Vlr Un Total Produto M
+GRUPO DE RENDIMENTO : DS - SUÍNO
+1110003-0 CARCAÇA SUÍNA C/ OSSO 12.850,000KG 140,000CX 91,785KG 0,00 0,00 R$
+Total Grupo: DS 12.850,000 140,000 0,000
+Total Matéria Prima : 12.850,000 140,000
+PRODUTO ACABADO
+Produto/Ref Descrição Produto Qtde UN Qtde UN Interna Rend. Apurado Rend. Esperado Valor Unit. Total Produto M
+GRUPO RENDIMENTO : DS - SUÍNO
+02010010010-0 CXGG - PERNIL SUINO DESOSSADO RESF 4.112,000 KG 100,000 CX 100 32,00 % 0,00 % 18,50 76.072,00 R$
+02010010020-0 CXGG - PALETA SUINA DESOSSADA RESF 2.377,250 KG 60,000 CX 060 18,50 % 0,00 % 16,80 39.937,80 R$
+02010010030-0 CXGG - LOMBO SUINO EXTRA RESF 1.220,750 KG 30,000 CX 030 9,50 % 0,00 % 22,00 26.856,50 R$
+02010010040-0 CXGG - COSTELA SUINA ESPECIAL RESF 963,750 KG 25,000 CX 025 7,50 % 0,00 % 24,50 23.611,88 R$
+02010010050-0 CXGG - BARRIGA / PANCETA SUINA RESF 1.670,500 KG 42,000 CX 042 13,00 % 0,00 % 21,00 35.080,50 R$
+02010010060-0 CXGG - BISTECA / CARRE SUINO RESF 963,750 KG 24,000 CX 024 7,50 % 0,00 % 19,50 18.793,13 R$
+02010010070-0 CXGG - COPA LOMBO / SOBREPALETA RESF 578,250 KG 14,000 CX 014 4,50 % 0,00 % 22,50 13.010,63 R$
+02010010080-0 CXGG - FILE MIGNON SUINO RESF 231,300 KG 6,000 CX 006 1,80 % 0,00 % 25,00 5.782,50 R$
+02010010090-0 W-MP - RECORTE SUINO INDUSTRIAL 514,000 KG 13,000 CX 013 4,00 % 0,00 % 11,50 5.911,00 R$
+02010990020-0 X-MP - TOUCINHO E BANHA SUINA RESF 578,250 KG 12,000 CX 012 4,50 % 0,00 % 5,50 3.180,38 R$
+02010990010-0 X-MP - OSSO SUINO DA DESOSSA 449,750 KG 10,000 CX 010 3,50 % 0,00 % 0,80 359,80 R$
+Total: DS 12.659,550 310,000 98,52 % 19,64 248.596,12
+RESUMO
+Grupo Rendimento Matéria-Prima (kg) Produto Acabado (kg) Rendimento Valor MP (R$) Valor PA (R$) Quebra (R$) M
+DS - SUÍNO 12.850,000 12.659,550 98,52 % 0,00 248.596,12 248.596,12 R$
+TOTALIZAÇÃO: 12.850,000 12.659,550 98,52 % 0,00 248.596,12 248.596,12
+QUEBRA: 190,450 1,4820 %
+Filtros Utilizados: Empresa: 021 Período: 27/08/2026 a 27/08/2026`;

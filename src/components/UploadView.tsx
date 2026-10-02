@@ -22,7 +22,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { RAW_SAMPLE_SISATAK_DT, RAW_SAMPLE_SISATAK_TR } from '../data/initialData';
+import { RAW_SAMPLE_SISATAK_DT, RAW_SAMPLE_SISATAK_TR, RAW_SAMPLE_SISATAK_DS } from '../data/initialData';
 import { CutType, ProductionRecord } from '../types';
 import { formatCurrency, formatKg, formatPct } from '../utils/calculations';
 import { parseSisAtakReport } from '../utils/parser';
@@ -41,7 +41,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
   const [rawText, setRawText] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [isExtracting, setIsExtracting] = useState<boolean>(false);
-  const [cutTypeOverride, setCutTypeOverride] = useState<'AUTO' | 'DIANTEIRO' | 'TRASEIRO'>('AUTO');
+  const [cutTypeOverride, setCutTypeOverride] = useState<'AUTO' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO'>('AUTO');
   const [shift, setShift] = useState<'Turno 1' | 'Turno 2' | 'Turno 3'>('Turno 1');
   const [operatorCount, setOperatorCount] = useState<number>(20);
   const [responsibleOperator, setResponsibleOperator] = useState<string>('Marcos Silveira');
@@ -57,7 +57,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
     textToParse: string,
     cost?: number,
     opCount?: number,
-    typeOverride: 'AUTO' | 'DIANTEIRO' | 'TRASEIRO' = cutTypeOverride,
+    typeOverride: 'AUTO' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' = cutTypeOverride,
     preDebonedKg?: number
   ) => {
     if (!textToParse.trim()) {
@@ -118,6 +118,18 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
     setCarcassCostPerKg(21.80);
     setCustomDate('2026-08-28');
     handleParse(RAW_SAMPLE_SISATAK_TR, 21.80, 22, 'TRASEIRO');
+  };
+
+  const handleLoadSampleDS = () => {
+    setFileName('RETQ010_Suino_27082026.txt');
+    setRawText(RAW_SAMPLE_SISATAK_DS);
+    setShift('Turno 1');
+    setOperatorCount(18);
+    setCutTypeOverride('SUINO');
+    setResponsibleOperator('Edmar Ferreira');
+    setCarcassCostPerKg(11.50);
+    setCustomDate('2026-08-27');
+    handleParse(RAW_SAMPLE_SISATAK_DS, 11.50, 18, 'SUINO');
   };
 
   // Handle file drop or selection with multi-format support (.pdf, .txt, .xlsx, .csv)
@@ -255,7 +267,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
               <Sparkles className="w-4 h-4 text-rose-700" />
               Modelos Oficiais do Frigorífico (Formulários Anexados):
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={handleLoadSampleDT}
@@ -264,10 +276,10 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
                 <div>
                   <div className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
                     <Beef className="w-4 h-4 text-amber-700" />
-                    Relatório SisAtak Dianteiro - DT (25/08/2026)
+                    SisAtak Dianteiro - DT (25/08)
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
-                    16.513,60 kg MP • 16.426,86 kg PA • Quebra 0,525% • 11 cortes
+                    16.513 kg MP • 16.426 kg PA • 11 cortes
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-2 py-1 bg-white text-amber-900 border border-amber-300 rounded group-hover:bg-amber-900 group-hover:text-white transition-colors">
@@ -283,13 +295,32 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
                 <div>
                   <div className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
                     <Beef className="w-4 h-4 text-rose-700" />
-                    Relatório SisAtak Traseiro - TR (28/08/2026)
+                    SisAtak Traseiro - TR (28/08)
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
-                    16.124,40 kg MP • 15.895,70 kg PA • Quebra 1,418% • 25 cortes
+                    16.124 kg MP • 15.895 kg PA • 25 cortes
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-2 py-1 bg-white text-rose-900 border border-rose-300 rounded group-hover:bg-rose-900 group-hover:text-white transition-colors">
+                  Carregar
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLoadSampleDS}
+                className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 text-left transition-colors flex items-center justify-between group"
+              >
+                <div>
+                  <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                    <Beef className="w-4 h-4 text-emerald-700" />
+                    SisAtak Suíno - DS (27/08)
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    12.850 kg MP • 12.659 kg PA • 11 cortes
+                  </p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-1 bg-white text-emerald-900 border border-emerald-300 rounded group-hover:bg-emerald-900 group-hover:text-white transition-colors">
                   Carregar
                 </span>
               </button>
@@ -372,7 +403,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
                   <select
                     value={cutTypeOverride}
                     onChange={(e) => {
-                      const t = e.target.value as 'AUTO' | 'DIANTEIRO' | 'TRASEIRO';
+                      const t = e.target.value as 'AUTO' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO';
                       setCutTypeOverride(t);
                       if (rawText) handleParse(rawText, carcassCostPerKg, operatorCount, t);
                     }}
@@ -381,6 +412,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
                     <option value="AUTO">Automático (SisAtak)</option>
                     <option value="TRASEIRO">TR - Traseiro Bovino</option>
                     <option value="DIANTEIRO">DT - Dianteiro Bovino</option>
+                    <option value="SUINO">DS - Desossa Suíno</option>
                   </select>
                 </div>
 
@@ -497,7 +529,11 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
                       </span>
                     )}
                     <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-200 text-emerald-900">
-                      {parsedPreview.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : 'TR - TRASEIRO'} • {parsedPreview.date}
+                      {parsedPreview.type === 'SUINO'
+                        ? 'DS - SUÍNO'
+                        : parsedPreview.type === 'DIANTEIRO'
+                        ? 'DT - DIANTEIRO'
+                        : 'TR - TRASEIRO'} • {parsedPreview.date}
                     </span>
                   </div>
                 </div>

@@ -60,6 +60,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       desc: 'Picanha, Contra-filé, Alcatra',
     },
     {
+      id: 'suino',
+      label: 'Desossa Suíno (DS)',
+      icon: Beef,
+      badge: 'DS',
+      desc: 'Pernil, Paleta, Lombo, Costela',
+    },
+    {
       id: 'upload',
       label: 'Upload SisAtak & Base',
       icon: UploadCloud,

@@ -93,7 +93,8 @@ export const AdminView: React.FC = () => {
   // Parameters state
   const [dtCost, setDtCost] = useState<number>(15.20);
   const [trCost, setTrCost] = useState<number>(21.80);
-  const [benchmarkFilter, setBenchmarkFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO'>('ALL');
+  const [dsCost, setDsCost] = useState<number>(11.50);
+  const [benchmarkFilter, setBenchmarkFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO'>('ALL');
 
   useEffect(() => {
     setSupabaseConfig(getSupabaseConfig());
@@ -298,7 +299,8 @@ export const AdminView: React.FC = () => {
     e.preventDefault();
     updateCarcassCost('DIANTEIRO', dtCost);
     updateCarcassCost('TRASEIRO', trCost);
-    showFeedback('Custos médios de carcaça atualizados e aplicados às margens!');
+    updateCarcassCost('SUINO', dsCost);
+    showFeedback('Custos médios de carcaça (DT, TR e DS) atualizados e aplicados às margens!');
   };
 
   const filteredBenchmarks = React.useMemo(() => {
@@ -1058,10 +1060,12 @@ export const AdminView: React.FC = () => {
                             className={`inline-flex px-2 py-0.5 rounded text-[10px] font-bold ${
                               r.type === 'DIANTEIRO'
                                 ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                : r.type === 'SUINO'
+                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
                                 : 'bg-rose-100 text-rose-900 border border-rose-200'
                             }`}
                           >
-                            {r.type === 'DIANTEIRO' ? 'Dianteiro (DT)' : 'Traseiro (TR)'}
+                            {r.type === 'DIANTEIRO' ? 'Dianteiro (DT)' : r.type === 'SUINO' ? 'Suíno (DS)' : 'Traseiro (TR)'}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-slate-700">
@@ -1235,7 +1239,7 @@ export const AdminView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveCosts} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
                   <span className="text-xs font-bold text-slate-700 block mb-1">
                     Custo Médio Dianteiro (DT):
@@ -1273,6 +1277,26 @@ export const AdminView: React.FC = () => {
                   </div>
                   <span className="text-[10px] text-slate-500 block mt-1">
                     Padrão de mercado atual: R$ 21,80 / kg
+                  </span>
+                </div>
+
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 block mb-1">
+                    Custo Médio Suíno (DS):
+                  </span>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">R$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={dsCost}
+                      onChange={(e) => setDsCost(parseFloat(e.target.value) || 0)}
+                      className="w-full pl-9 pr-3 py-2 text-sm font-bold font-mono bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500 block mt-1">
+                    Padrão de mercado atual: R$ 11,50 / kg
                   </span>
                 </div>
               </div>
@@ -1326,6 +1350,14 @@ export const AdminView: React.FC = () => {
                 >
                   Traseiro (TR)
                 </button>
+                <button
+                  onClick={() => setBenchmarkFilter('SUINO')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    benchmarkFilter === 'SUINO' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  Suíno (DS)
+                </button>
               </div>
             </div>
 
@@ -1348,9 +1380,13 @@ export const AdminView: React.FC = () => {
                       <td className="py-2 px-3 font-semibold text-slate-900">{b.name}</td>
                       <td className="py-2 px-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          b.type === 'DIANTEIRO' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                          b.type === 'DIANTEIRO'
+                            ? 'bg-amber-100 text-amber-800'
+                            : b.type === 'SUINO'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
                         }`}>
-                          {b.type === 'DIANTEIRO' ? 'DT' : 'TR'}
+                          {b.type === 'DIANTEIRO' ? 'DT' : b.type === 'SUINO' ? 'DS' : 'TR'}
                         </span>
                       </td>
                       <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">

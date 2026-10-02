@@ -51,6 +51,18 @@ export const STANDARDS_TRASEIRO: { name: string; standardPct: number; codeRef: s
   { name: 'Sebo', standardPct: 1.00, codeRef: '01010990023' },
 ];
 
+export const STANDARDS_SUINO: { name: string; standardPct: number; codeRef?: string }[] = [
+  { name: 'Pernil', standardPct: 32.00, codeRef: 'PERNIL_SUINO' },
+  { name: 'Paleta', standardPct: 18.50, codeRef: 'PALETA_SUINA' },
+  { name: 'Lombo', standardPct: 9.50, codeRef: 'LOMBO_SUINO' },
+  { name: 'Costela', standardPct: 7.50, codeRef: 'COSTELA_SUINA' },
+  { name: 'Barriga / Panceta', standardPct: 13.00, codeRef: 'BARRIGA_PANCETA' },
+  { name: 'Bisteca / Carré', standardPct: 7.50, codeRef: 'BISTECA_CARRE' },
+  { name: 'Toucinho / Banha', standardPct: 4.50, codeRef: 'TOUCINHO_SUINO' },
+  { name: 'Recorte', standardPct: 4.00, codeRef: 'RECORTE_SUINO' },
+  { name: 'Osso', standardPct: 3.50, codeRef: 'OSSO_SUINO' },
+];
+
 /**
  * Normaliza o texto para casamento de padrões
  */
@@ -104,6 +116,24 @@ export function matchGroupTraseiro(cut: { name: string; code?: string }): string
 }
 
 /**
+ * Identifica o grupo padrão do Suíno para um corte
+ */
+export function matchGroupSuino(cut: { name: string; code?: string }): string {
+  const n = cleanText(cut.name);
+  if (/OSSO/i.test(n)) return 'Osso';
+  if (/TOUCINHO|BANHA|PAPADA|SEBO|GORDURA/i.test(n)) return 'Toucinho / Banha';
+  if (/PERNIL/i.test(n)) return 'Pernil';
+  if (/PALETA/i.test(n)) return 'Paleta';
+  if (/LOMBO/i.test(n)) return 'Lombo';
+  if (/COSTELA|COSTELINHA/i.test(n)) return 'Costela';
+  if (/BARRIGA|PANCETA/i.test(n)) return 'Barriga / Panceta';
+  if (/BISTECA|CARRE|CHOP/i.test(n)) return 'Bisteca / Carré';
+  if (/RECORTE|RETALHO|MOIDA|CARNE INDUSTRIAL/i.test(n)) return 'Recorte';
+
+  return 'Recorte';
+}
+
+/**
  * Agrupa cortes por tipo e calcula o rendimento apurado vs padrão
  */
 export function calculateGroupedYields(
@@ -113,8 +143,16 @@ export function calculateGroupedYields(
   const filtered = records.filter((r) => r.type === targetType);
   const totalMP = filtered.reduce((acc, r) => acc + r.rawMaterialWeightKg, 0);
 
-  const standards = targetType === 'DIANTEIRO' ? STANDARDS_DIANTEIRO : STANDARDS_TRASEIRO;
-  const matchFn = targetType === 'DIANTEIRO' ? matchGroupDianteiro : matchGroupTraseiro;
+  const standards = targetType === 'DIANTEIRO'
+    ? STANDARDS_DIANTEIRO
+    : targetType === 'SUINO'
+    ? STANDARDS_SUINO
+    : STANDARDS_TRASEIRO;
+  const matchFn = targetType === 'DIANTEIRO'
+    ? matchGroupDianteiro
+    : targetType === 'SUINO'
+    ? matchGroupSuino
+    : matchGroupTraseiro;
 
   // Inicializar acumuladores para cada grupo oficial
   const groupWeights: Record<string, number> = {};
@@ -137,7 +175,7 @@ export function calculateGroupedYields(
     const w = groupWeights[std.name] || 0;
     const yieldActualPct = totalMP > 0 ? (w / totalMP) * 100 : 0;
     const deviationPct = yieldActualPct - std.standardPct;
-    const isSubProduct = std.name === 'Osso' || std.name === 'Sebo';
+    const isSubProduct = std.name === 'Osso' || std.name === 'Sebo' || std.name === 'Toucinho / Banha';
 
     return {
       id: `grp_${targetType.toLowerCase()}_${idx}`,
