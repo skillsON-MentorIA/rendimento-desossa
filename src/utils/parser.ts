@@ -139,8 +139,8 @@ export function parseSisAtakReport(
     }
   }
 
-  // Pattern: (TR - TRASEIRO | DT - DIANTEIRO | DS - SUÍNO) 16.124,400 15.895,695 98,58 % 0,00 448.200,04
-  const resumoGrupoMatch = rawText.match(/(?:TR|DT|DS)\s*-\s*(?:TRASEIRO|DIANTEIRO|SU[IÍ]NO)\s+([^\n\r]+)/i);
+  // Pattern: (TR - TRASEIRO | DT - DIANTEIRO | DS - SUÍNO | SU - SUÍNO) 16.124,400 15.895,695 98,58 % 0,00 448.200,04
+  const resumoGrupoMatch = rawText.match(/(?:TR|DT|DS|SU)\s*-\s*(?:TRASEIRO|DIANTEIRO|SU[IÍ]NO)\s+([^\n\r]+)/i);
   if (resumoGrupoMatch) {
     const nums = [...resumoGrupoMatch[1].matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,4})/g)].map((x) => parseBrNumber(x[1]));
     if (nums.length >= 2) {
@@ -152,8 +152,8 @@ export function parseSisAtakReport(
     }
   }
 
-  // Pattern: Total: TR / DT / DS 15.895,695 493,000 98,58 % 28,20 448.200,04
-  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT|DS)\s+([^\n\r]+)/i);
+  // Pattern: Total: TR / DT / DS / SU 15.895,695 493,000 98,58 % 28,20 448.200,04
+  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT|DS|SU)\s+([^\n\r]+)/i);
   if (totalCutsRowMatch) {
     const nums = [...totalCutsRowMatch[1].matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,4})/g)].map((x) => parseBrNumber(x[1]));
     if (nums.length >= 2) {
@@ -177,7 +177,7 @@ export function parseSisAtakReport(
   // 4. Raw Material Line in Table
   let rawMaterialWeightKg = mpFromSummary;
   let rawMaterialBoxes = 0;
-  let rawMaterialCode = isSuino ? '1110003-0' : isTraseiro ? '1110001-0' : '1110002-0';
+  let rawMaterialCode = isSuino ? '2110001-0' : isTraseiro ? '1110001-0' : '1110002-0';
   let rawMaterialDesc = isSuino ? 'CARCAÇA SUÍNA C/ OSSO' : isTraseiro ? 'TRASEIRO BOVINO C/ OSSO' : 'DIANTEIRO BOVINO C/ OSSO';
   let detectedPreDebonedKg = 0;
   const hasPaHeader = /PRODUTO\s+ACABADO/i.test(rawText);
@@ -192,10 +192,10 @@ export function parseSisAtakReport(
       inRawMaterialSection = false;
     }
 
-    // Detecção de carnes que já entraram desossadas no cabeçalho/matéria-prima
-    if (inRawMaterialSection || (!hasPaHeader && !/^Total:/i.test(line))) {
+    // Detecção de carnes que já entraram desossadas no cabeçalho/matéria-prima (apenas se estiver dentro da seção de matéria-prima)
+    if (inRawMaterialSection) {
       const isPreDebonedText = /S\/\s*OSSO|SEM\s*OSSO|DESOSSAD|DESOSSADO|CARNE\s+DESOSSADA/i.test(line);
-      const isBoneIn = /C\/\s*OSSO|COM\s*OSSO|BOVINO\s+C\/|SU[IÍ]NO\s+C\//i.test(line);
+      const isBoneIn = /C\/\s*OSSO|COM\s*OSSO|BOVINO\s+C\/|SU[IÍ]NO\s+C\/|1\/2\s*CARCACA/i.test(line);
       if (isPreDebonedText && !isBoneIn) {
         const matchKg = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*KG/i);
         if (matchKg) {
@@ -204,7 +204,7 @@ export function parseSisAtakReport(
       }
     }
 
-    if (/BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[123]/i.test(line)) {
+    if (/BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCACA\s+SUINA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[123]|211000[123]/i.test(line)) {
       const matchKg = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*KG/i);
       const matchCx = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*CX/i);
       if (matchKg && rawMaterialWeightKg === 0) {
@@ -215,9 +215,14 @@ export function parseSisAtakReport(
       }
       const codeM = line.match(/(\d{5,11}(?:-\d)?)/);
       if (codeM) rawMaterialCode = codeM[1];
+      if (/1\/2\s*CARCACA\s+SUINA\s+MATRIZ/i.test(line)) {
+        rawMaterialDesc = '1/2 CARCAÇA SUÍNA MATRIZ';
+      } else if (/1\/2\s*CARCACA\s+SUINA/i.test(line)) {
+        rawMaterialDesc = '1/2 CARCAÇA SUÍNA';
+      }
     }
 
-    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT|DS)/i.test(line)) {
+    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT|DS|SU)/i.test(line)) {
       const nums = [...line.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,3})/g)].map((x) => parseBrNumber(x[1]));
       if (nums.length >= 1 && rawMaterialWeightKg === 0) {
         rawMaterialWeightKg = nums[0];
@@ -240,7 +245,7 @@ export function parseSisAtakReport(
       inProdutoAcabado = true;
       continue;
     }
-    if (/^Total:\s*(?:TR|DT|DS)/i.test(line) || /^RESUMO/i.test(line) || /^TOTALIZA[ÇC][ÃA]O/i.test(line) || /Filtros\s+Utilizados/i.test(line)) {
+    if (/^Total:\s*(?:TR|DT|DS|SU)/i.test(line) || /^RESUMO/i.test(line) || /^TOTALIZA[ÇC][ÃA]O/i.test(line) || /Filtros\s+Utilizados/i.test(line)) {
       inProdutoAcabado = false;
       continue;
     }
@@ -259,7 +264,7 @@ export function parseSisAtakReport(
     const rest = codeMatch[2];
 
     // Explicitly prevent raw material from being recorded as a finished cut
-    if (code === rawMaterialCode || /BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(rest) || /MAT[ÉE]RIA.PRIMA/i.test(rest)) {
+    if (code === rawMaterialCode || /BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCACA\s+SUINA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(rest) || /MAT[ÉE]RIA.PRIMA/i.test(rest)) {
       continue;
     }
 
@@ -288,15 +293,33 @@ export function parseSisAtakReport(
         unitPrice = weightKg > 0 ? totalPrice / weightKg : 0;
       }
 
-      const isBone = /OSSO/i.test(name);
-      const isFat = /SEBO|TOUCINHO|BANHA/i.test(name);
+      // REGRA OFICIAL DE IDENTIFICAÇÃO DE OSSO E SUBPRODUTOS:
+      // Atenção: Produtos com "S/OSSO" ou "S/ OSSO" ou "SEM OSSO" (como PERNIL S/OSSO, PALETA S/OSSO)
+      // NUNCA são subprodutos osso - são carnes vendáveis nobres de alto valor!
+      const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(name);
+
+      let isBone = false;
+      let isFat = false;
+
+      if (type === 'SUINO') {
+        // Conforme instrução expressa do cliente:
+        // Considere como OSSO exclusivamente o subproduto com código/descrição X-MP - OSSO SUÍNO (ex: 02010990005-0)
+        isBone = !isSemOsso && (/X-MP.*OSSO/i.test(name) || /X-MP.*OSSO/i.test(line) || code.includes('02010990005') || (/OSSO/i.test(name) && /X-MP/i.test(name)));
+        // Em suínos, toucinho e gorduras de rama são itens comerciais vendidos com preço de PA
+        isFat = false;
+      } else {
+        // Bovino (DT/TR): osso subproduto descartável (desde que não seja carne S/OSSO)
+        isBone = !isSemOsso && (/OSSO/i.test(name) || code.includes('01010990022'));
+        isFat = /SEBO/i.test(name) || code.includes('01010990023');
+      }
+
       const isNonSaleable = isBone || isFat;
 
       let category: CutItem['category'] = 'RECORTE';
       if (isBone) category = 'SUBPRODUTO_OSSO';
       else if (isFat) category = 'SUBPRODUTO_SEBO';
       else if (type === 'SUINO') {
-        if (/RECORTE|RETALHO|MOIDA/i.test(name)) category = 'RECORTE';
+        if (/RECORTE|RETALHO|MOIDA|CARNE\s+INDUSTRIAL|PEZINHO|RABINHO|PELE/i.test(name)) category = 'RECORTE';
         else category = 'SUINO';
       }
       else if (/PICANHA|FIL[ÉE]\s*MIGNON|CONTRA\s*FIL[ÉE]|ALCATRA|CORA[ÇC][ÃA]O|MAMINHA/i.test(name)) category = 'NOBRE';
@@ -408,7 +431,7 @@ export function parseSisAtakReport(
   const totalYieldPct = totalCarcassWeightKg > 0 ? (finishedProductWeightKg / totalCarcassWeightKg) * 100 : 0;
 
   // 9. Financials & Costs
-  const carcassCostPerKg = extraParams.carcassCostPerKg ?? (type === 'SUINO' ? 11.50 : type === 'TRASEIRO' ? 21.80 : 15.20);
+  const carcassCostPerKg = extraParams.carcassCostPerKg ?? (type === 'SUINO' ? 9.30 : type === 'TRASEIRO' ? 21.80 : 15.20);
   const totalCarcassCost = rawMaterialWeightKg * carcassCostPerKg;
   const grossProfitValue = finishedProductTotalValue - totalCarcassCost;
   const profitMarginPct = finishedProductTotalValue > 0 ? (grossProfitValue / finishedProductTotalValue) * 100 : 0;

@@ -51,6 +51,7 @@ interface AppContextType {
   lastExportDate: string | null;
   setLastExportDate: (date: string | null) => void;
   updateBenchmark: (code: string, newExpectedPct: number) => void;
+  carcassCosts: { DIANTEIRO: number; TRASEIRO: number; SUINO: number };
   updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => void;
   resetToDemoData: () => void;
   login: (username: string, password?: string) => { success: boolean; message?: string };
@@ -72,8 +73,97 @@ const STORAGE_KEY_USER = 'frigo_kpi_active_user_v3';
 const STORAGE_KEY_USERS = 'frigo_kpi_users_v3';
 const STORAGE_KEY_BENCHMARKS = 'frigo_kpi_benchmarks_v1';
 const STORAGE_KEY_LAST_EXPORT = 'frigo_last_export_date_v1';
+const STORAGE_KEY_CARCASS_COSTS = 'frigo_kpi_carcass_costs_v2';
+
+export interface CarcassCostsState {
+  DIANTEIRO: number;
+  TRASEIRO: number;
+  SUINO: number;
+}
+
+const DEFAULT_CARCASS_COSTS: CarcassCostsState = {
+  DIANTEIRO: 15.20,
+  TRASEIRO: 21.80,
+  SUINO: 9.30,
+};
+
+/**
+ * Garante que produtos sem osso (como PERNIL S/OSSO, PALETA S/OSSO) não sejam contabilizados
+ * incorretamente como subproduto osso em lotes suínos já existentes no banco local.
+ */
+function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number = 9.30): ProductionRecord {
+  if (r.type !== 'SUINO' || !r.cuts || r.cuts.length === 0) return r;
+
+  const updatedCuts = r.cuts.map((cut) => {
+    const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(cut.name);
+    const isBone = !isSemOsso && (
+      /X-MP.*OSSO/i.test(cut.name) ||
+      cut.code.includes('02010990005') ||
+      (/OSSO/i.test(cut.name) && /X-MP/i.test(cut.name))
+    );
+    const category: CutItem['category'] = isBone
+      ? 'SUBPRODUTO_OSSO'
+      : /RECORTE|RETALHO|MOIDA|CARNE\s+INDUSTRIAL|PEZINHO|RABINHO|PELE/i.test(cut.name)
+      ? 'RECORTE'
+      : 'SUINO';
+    return {
+      ...cut,
+      isNonSaleable: isBone,
+      category,
+    };
+  });
+
+  const boneWeightKg = updatedCuts.filter((c) => c.category === 'SUBPRODUTO_OSSO').reduce((a, b) => a + b.weightKg, 0);
+  const fatWeightKg = 0; // Em suínos, toucinho e gorduras são cortes vendáveis
+  const nonSaleableWeightKg = boneWeightKg + fatWeightKg;
+  const saleableCutsWeightKg = Math.max(0, r.finishedProductWeightKg - nonSaleableWeightKg);
+
+  const calculatedCarcass = saleableCutsWeightKg + boneWeightKg + fatWeightKg + r.lossKg;
+  const totalCarcassWeightKg = calculatedCarcass > 0 ? calculatedCarcass : r.rawMaterialWeightKg;
+
+  const preDebonedInputKg = r.preDebonedInputKg || 0;
+  const deboningEffectiveMeatKg = Math.max(0, saleableCutsWeightKg - preDebonedInputKg);
+  const carcassWithBoneWeightKg = Math.max(0, totalCarcassWeightKg - preDebonedInputKg);
+  const deboningYieldNetPct = carcassWithBoneWeightKg > 0 ? (deboningEffectiveMeatKg / carcassWithBoneWeightKg) * 100 : 0;
+
+  // Se o lote suíno herdou por engano o custo bovino de 15.50, calibrar para o custo suíno correto
+  const costPerKg = (r.carcassCostPerKg >= 15.00) ? currentSuinoCost : r.carcassCostPerKg;
+  const totalCarcassCost = r.rawMaterialWeightKg * costPerKg;
+  const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
+  const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
+
+  return {
+    ...r,
+    cuts: updatedCuts,
+    boneWeightKg,
+    fatWeightKg,
+    nonSaleableWeightKg,
+    saleableCutsWeightKg,
+    deboningYieldNetPct,
+    carcassCostPerKg: costPerKg,
+    totalCarcassCost,
+    grossProfitValue,
+    profitMarginPct,
+  };
+}
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Configured Carcass Costs
+  const [carcassCosts, setCarcassCosts] = useState<CarcassCostsState>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CARCASS_COSTS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.DIANTEIRO === 'number' && typeof parsed.TRASEIRO === 'number' && typeof parsed.SUINO === 'number') {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_CARCASS_COSTS;
+  });
+
   // Users list persisted in localStorage
   const [users, setUsers] = useState<User[]>(() => {
     // Purge old versions that contained fictitious mock names
@@ -143,8 +233,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Return exactly the saved records without re-inserting deleted items
-          return parsed.filter((p: ProductionRecord) => !deletedIds.has(p.id));
+          // Return sanitized records without re-inserting deleted items
+          return parsed
+            .filter((p: ProductionRecord) => !deletedIds.has(p.id))
+            .map((p: ProductionRecord) => sanitizeProductionRecord(p, 9.30));
         }
       } catch (e) {
         console.error(e);
@@ -152,7 +244,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // First time opening the application ever (saved === null):
-    return INITIAL_PRODUCTION_RECORDS.filter((r) => !deletedIds.has(r.id));
+    return INITIAL_PRODUCTION_RECORDS
+      .filter((r) => !deletedIds.has(r.id))
+      .map((p) => sanitizeProductionRecord(p, 9.30));
   });
 
   const [lastExportDate, setLastExportDate] = useState<string | null>(() => {
@@ -493,6 +587,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => {
+    setCarcassCosts((prev) => {
+      const next = { ...prev, [type]: newCost };
+      localStorage.setItem(STORAGE_KEY_CARCASS_COSTS, JSON.stringify(next));
+      return next;
+    });
+
     setRecords((prev) =>
       prev.map((r) => {
         if (r.type !== type) return r;
@@ -588,6 +688,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastExportDate,
         setLastExportDate,
         updateBenchmark,
+        carcassCosts,
         updateCarcassCost,
         resetToDemoData,
         login,

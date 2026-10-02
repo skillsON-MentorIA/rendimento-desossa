@@ -120,15 +120,24 @@ export function matchGroupTraseiro(cut: { name: string; code?: string }): string
  */
 export function matchGroupSuino(cut: { name: string; code?: string }): string {
   const n = cleanText(cut.name);
-  if (/OSSO/i.test(n)) return 'Osso';
-  if (/TOUCINHO|BANHA|PAPADA|SEBO|GORDURA/i.test(n)) return 'Toucinho / Banha';
+  const code = (cut.code || '').replace(/\D/g, '');
+
+  // Subproduto Osso Suíno: exclusivamente X-MP - OSSO SUÍNO (código 02010990005)
+  // IMPORTANTE: Produtos como "PERNIL S/OSSO" ou "PALETA S/OSSO" JAMAIS são ossos!
+  if (!/S\/\s*OSSO|SEM\s*OSSO/i.test(n)) {
+    if (/X-MP.*OSSO/i.test(n) || code.includes('02010990005') || (/OSSO/i.test(n) && !/PERNIL|PALETA|COSTELA|LOMBO|BISTECA|BARRIGA/i.test(n))) {
+      return 'Osso';
+    }
+  }
+
   if (/PERNIL/i.test(n)) return 'Pernil';
   if (/PALETA/i.test(n)) return 'Paleta';
   if (/LOMBO/i.test(n)) return 'Lombo';
   if (/COSTELA|COSTELINHA/i.test(n)) return 'Costela';
   if (/BARRIGA|PANCETA/i.test(n)) return 'Barriga / Panceta';
   if (/BISTECA|CARRE|CHOP/i.test(n)) return 'Bisteca / Carré';
-  if (/RECORTE|RETALHO|MOIDA|CARNE INDUSTRIAL/i.test(n)) return 'Recorte';
+  if (/TOUCINHO|BANHA|PAPADA|GORDURA/i.test(n)) return 'Toucinho / Banha';
+  if (/RECORTE|RETALHO|MOIDA|CARNE INDUSTRIAL|PEZINHO|RABINHO|PELE/i.test(n)) return 'Recorte';
 
   return 'Recorte';
 }
@@ -175,7 +184,9 @@ export function calculateGroupedYields(
     const w = groupWeights[std.name] || 0;
     const yieldActualPct = totalMP > 0 ? (w / totalMP) * 100 : 0;
     const deviationPct = yieldActualPct - std.standardPct;
-    const isSubProduct = std.name === 'Osso' || std.name === 'Sebo' || std.name === 'Toucinho / Banha';
+    const isSubProduct = targetType === 'SUINO'
+      ? std.name === 'Osso'
+      : (std.name === 'Osso' || std.name === 'Sebo');
 
     return {
       id: `grp_${targetType.toLowerCase()}_${idx}`,
@@ -191,10 +202,10 @@ export function calculateGroupedYields(
   });
 
   const totalBoneWeightKg = groupWeights['Osso'] || 0;
-  const totalFatWeightKg = groupWeights['Sebo'] || 0;
+  const totalFatWeightKg = targetType === 'SUINO' ? 0 : (groupWeights['Sebo'] || 0);
   const totalSubProductsKg = totalBoneWeightKg + totalFatWeightKg;
   const totalMeatWeightKg = Object.entries(groupWeights)
-    .filter(([k]) => k !== 'Osso' && k !== 'Sebo')
+    .filter(([k]) => k !== 'Osso' && (targetType === 'SUINO' || k !== 'Sebo'))
     .reduce((acc, [, v]) => acc + v, 0);
 
   const totalYieldActualPct = items.reduce((acc, i) => acc + i.yieldActualPct, 0);
