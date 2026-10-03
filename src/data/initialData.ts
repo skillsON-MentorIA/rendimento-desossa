@@ -599,7 +599,7 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
     responsibleOperator: 'Edmar Ferreira (Líder Desossa DS)',
     operatorCount: 18,
     rawMaterialCode: '1110003-0',
-    rawMaterialDesc: 'CARCAÇA SUÍNA C/ OSSO',
+    rawMaterialDesc: '1/2 CARCAÇA SUÍNA MATRIZ',
     rawMaterialWeightKg: 12850.000,
     rawMaterialBoxes: 140,
     rawMaterialAvgWeightKg: 91.785,

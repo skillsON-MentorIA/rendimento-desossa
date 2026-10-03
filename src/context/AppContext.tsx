@@ -149,9 +149,15 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
   const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
   const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
 
+  let rawMaterialDesc = r.rawMaterialDesc;
+  if (!rawMaterialDesc || rawMaterialDesc === 'CARCAÇA SUÍNA C/ OSSO' || /MATRIZ/i.test(rawMaterialDesc) || r.rawMaterialCode?.includes('1110003') || r.rawMaterialWeightKg === 21284) {
+    rawMaterialDesc = '1/2 CARCAÇA SUÍNA MATRIZ';
+  }
+
   return {
     ...r,
     type,
+    rawMaterialDesc,
     cuts: updatedCuts,
     boneWeightKg,
     fatWeightKg: 0,

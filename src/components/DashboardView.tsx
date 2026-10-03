@@ -204,7 +204,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Target benchmarks
   const TARGET_DEBONING_YIELD = 76.5; // Meta de rendimento desossa (carnes vendáveis sobre peso da carcaça)
   const TARGET_LOSS_MAX = 0.80; // Meta de quebra <= 0.80%
-  const TARGET_PRODUCTIVITY = 800; // Meta 800 kg/pessoa
   const TARGET_PROFIT_MARGIN = 20.0; // Meta 20% margem
 
   return (
@@ -780,19 +779,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">
-              Meta: <strong className="text-slate-700 font-bold">{TARGET_PRODUCTIVITY} kg</strong>
+              Efetivo Total: <strong className="text-slate-700 font-bold">{summary.totalOperatorCount} pessoas</strong>
             </span>
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0 whitespace-nowrap ${
-                summary.avgProductivityKgPerPerson >= TARGET_PRODUCTIVITY ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-              }`}
-            >
-              {summary.avgProductivityKgPerPerson >= TARGET_PRODUCTIVITY ? (
-                <CheckCircle2 className="w-3 h-3" />
-              ) : (
-                <AlertTriangle className="w-3 h-3" />
-              )}
-              {summary.avgProductivityKgPerPerson >= TARGET_PRODUCTIVITY ? 'Batida' : 'Abaixo'}
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 shrink-0 whitespace-nowrap">
+              Operacional
             </span>
           </div>
         </div>
@@ -898,11 +888,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   contentStyle={{ backgroundColor: '#0f172a', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                <Bar dataKey="productivityKgPerPerson" name="Kg / Pessoa" fill="#d97706" radius={[4, 4, 0, 0]}>
-                  {weeklyData.map((entry, index) => (
+                <Bar dataKey="productivityKgPerPerson" name="Kg / Pessoa" fill="#2563eb" radius={[4, 4, 0, 0]}>
+                  {weeklyData.map((_entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.productivityKgPerPerson >= TARGET_PRODUCTIVITY ? '#059669' : '#d97706'}
+                      fill="#2563eb"
                     />
                   ))}
                   <LabelList

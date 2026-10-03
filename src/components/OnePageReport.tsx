@@ -536,11 +536,16 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
 
           {/* BOX 1: INDICADORES DA OPERAÇÃO DO DIA / LOTE ATIVO */}
           <div className="mb-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-rose-700" />
-                Indicadores da Operação do Dia / Lote ({activeRecord.date.split('-').reverse().join('/')})
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-rose-700" />
+                  Indicadores da Operação do Dia / Lote ({activeRecord.date.split('-').reverse().join('/')})
+                </span>
+                <span className="text-[9.5px] font-black uppercase px-2 py-0.5 rounded bg-rose-100 text-rose-900 border border-rose-200 tracking-wide font-mono">
+                  {activeRecord.rawMaterialDesc || (activeRecord.type === 'SUINO' ? '1/2 CARCAÇA SUÍNA MATRIZ' : activeRecord.type === 'TRASEIRO' ? 'TRASEIRO BOVINO C/ OSSO' : 'DIANTEIRO BOVINO C/ OSSO')}
+                </span>
+              </div>
               <span className="text-[9px] font-bold text-slate-500 font-mono">
                 {activeRecord.shift} • Carcaça: {formatKg(activeRecord.rawMaterialWeightKg, 0)}
               </span>
@@ -593,7 +598,9 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   {formatPct(activeRecord.nonSaleablePct, 2)}
                 </span>
                 <span className="text-[8.5px] text-slate-600 font-medium block truncate h-3.5 leading-3.5 font-mono" title={`Osso: ${formatKg(activeRecord.boneWeightKg, 0)} (${formatPct(activeRecord.bonePct, 2)}) | Sebo: ${formatKg(activeRecord.fatWeightKg, 0)} (${formatPct(activeRecord.fatPct, 2)})`}>
-                  Osso {formatPct(activeRecord.bonePct, 1)} • Sebo {formatPct(activeRecord.fatPct, 1)}
+                  {activeRecord.type === 'SUINO'
+                    ? `Osso ${formatPct(activeRecord.bonePct, 1)}`
+                    : `Osso ${formatPct(activeRecord.bonePct, 1)} • Sebo ${formatPct(activeRecord.fatPct, 1)}`}
                 </span>
               </div>
 
@@ -623,7 +630,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 </span>
               </div>
 
-              {/* KPI 6 - Produtividade */}
+              {/* KPI 6 - Produtividade (Sem indicação de meta arbitrária) */}
               <div className="p-1.5 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[62px]">
                 <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3.5 leading-3.5">
                   6. Produtividade
@@ -632,7 +639,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   {activeRecord.productivityKgPerPerson.toFixed(1)} <span className="text-[8.5px] font-normal ml-0.5">kg/p</span>
                 </span>
                 <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5">
-                  Meta: 800 kg/p ({activeRecord.operatorCount} pess.)
+                  Equipe: {activeRecord.operatorCount} {activeRecord.operatorCount === 1 ? 'pessoa' : 'pessoas'}
                 </span>
               </div>
             </div>
@@ -963,7 +970,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   {monthSummary.avgProductivityKgPerPerson.toFixed(1)} <span className="text-[8.5px] font-normal ml-0.5">kg/p</span>
                 </span>
                 <span className="text-[8.5px] text-slate-500 font-medium block truncate h-3.5 leading-3.5">
-                  Meta: 800 kg/p ({monthSummary.totalOperatorCount} pess.)
+                  Equipe: {monthSummary.totalOperatorCount} {monthSummary.totalOperatorCount === 1 ? 'pessoa' : 'pessoas'}
                 </span>
               </div>
             </div>

@@ -233,6 +233,28 @@ export function parseSisAtakReport(
     }
   }
 
+  // Identificação inteligente do cabeçalho SisAtak logo abaixo de GRUPO DE RENDIMENTO
+  const grupoRendimentoBlock = rawText.match(/GRUPO\s+DE\s+RENDIMENTO\s*:\s*[^\n\r]+[\r\n]+([^\n\r]+)/i);
+  if (grupoRendimentoBlock && grupoRendimentoBlock[1]) {
+    const candidate = grupoRendimentoBlock[1].trim();
+    const cleaned = candidate
+      .replace(/^PRODUTO\s*:\s*/i, '')
+      .replace(/^\d{5,12}(?:-\d)?\s*-\s*/, '')
+      .replace(/^MP\s*-\s*/i, '')
+      .trim();
+    if (cleaned.length >= 4 && !/^(DATA|PERIODO|HORA|PAGINA|TOTAL|ITEM|CODIGO|FILIAL)/i.test(cleaned)) {
+      rawMaterialDesc = cleaned.toUpperCase();
+    }
+  }
+
+  if (/1\/2\s*CARCA[ÇC]A\s+SU[IÍ]NA\s+MATRIZ/i.test(rawText)) {
+    rawMaterialDesc = '1/2 CARCAÇA SUÍNA MATRIZ';
+  } else if (/1\/2\s*CARCA[ÇC]A\s+SU[IÍ]NA/i.test(rawText) && !/MATRIZ/i.test(rawMaterialDesc)) {
+    rawMaterialDesc = '1/2 CARCAÇA SUÍNA';
+  } else if (/CARCA[ÇC]A\s+SU[IÍ]NA\s+MATRIZ/i.test(rawText)) {
+    rawMaterialDesc = 'CARCAÇA SUÍNA MATRIZ';
+  }
+
   const rawMaterialAvgWeightKg = rawMaterialBoxes > 0 ? rawMaterialWeightKg / rawMaterialBoxes : 0;
 
   // 5. Individual Cuts Extraction
