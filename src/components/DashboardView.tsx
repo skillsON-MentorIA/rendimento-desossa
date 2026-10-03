@@ -196,8 +196,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const countDtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'DIANTEIRO').length, [periodAllRecords]);
   const countTrInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'TRASEIRO').length, [periodAllRecords]);
+  const countDsInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').length, [periodAllRecords]);
   const kgDtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'DIANTEIRO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
   const kgTrInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'TRASEIRO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
+  const kgDsInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
 
   // Target benchmarks
   const TARGET_DEBONING_YIELD = 76.5; // Meta de rendimento desossa (carnes vendáveis sobre peso da carcaça)
@@ -495,7 +497,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Consolidado da Planta (DT + TR)
+                Consolidado Geral (DT + TR + DS)
               </button>
 
               <button
@@ -541,22 +543,51 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </span>
                 )}
               </button>
+
+              <button
+                id="btn-filter-line-ds"
+                onClick={() => setFilters((f) => ({ ...f, type: 'SUINO' }))}
+                className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
+                  filters.type === 'SUINO'
+                    ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                    : 'text-slate-700 hover:text-emerald-800'
+                }`}
+              >
+                <Beef className="w-3.5 h-3.5" />
+                Desossa Suína (DS)
+                {countDsInPeriod > 0 && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                      filters.type === 'SUINO' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-900'
+                    }`}
+                  >
+                    {countDsInPeriod} lote(s)
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
           {/* Quick Line Overview / Parallel Warning */}
-          {countDtInPeriod > 0 && countTrInPeriod > 0 && filters.viewMode === 'daily' ? (
+          {((countDtInPeriod > 0 ? 1 : 0) + (countTrInPeriod > 0 ? 1 : 0) + (countDsInPeriod > 0 ? 1 : 0)) > 1 && filters.viewMode === 'daily' ? (
             <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>
-                <strong>Linhas Simultâneas no Mesmo Dia:</strong> DT ({formatKg(kgDtInPeriod)}) e TR ({formatKg(kgTrInPeriod)}) operando paralelamente.
+                <strong>Linhas Simultâneas no Mesmo Dia:</strong>{' '}
+                {[
+                  countDtInPeriod > 0 ? `DT (${formatKg(kgDtInPeriod)})` : null,
+                  countTrInPeriod > 0 ? `TR (${formatKg(kgTrInPeriod)})` : null,
+                  countDsInPeriod > 0 ? `DS (${formatKg(kgDsInPeriod)})` : null,
+                ].filter(Boolean).join(' • ')}{' '}
+                operando paralelamente.
               </span>
             </div>
           ) : (
             <div className="text-xs text-slate-500 font-medium">
               {filters.type === 'DIANTEIRO' && 'Exibindo indicadores exclusivos da esteira de Dianteiro (Acém, Paleta, Peito, etc.).'}
               {filters.type === 'TRASEIRO' && 'Exibindo indicadores exclusivos da esteira de Traseiro (Picanha, Mignon, Alcatra, etc.).'}
-              {filters.type === 'ALL' && 'Exibindo soma das linhas operadas no período selecionado.'}
+              {filters.type === 'SUINO' && 'Exibindo indicadores exclusivos da esteira de Suíno (Pernil, Paleta, Lombo, Costelinha, etc.).'}
+              {filters.type === 'ALL' && 'Exibindo soma das linhas operadas no período selecionado (DT + TR + DS).'}
             </div>
           )}
         </div>
@@ -1217,13 +1248,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </td>
                     <td className="py-3 px-3">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
                           r.type === 'DIANTEIRO'
-                            ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                            : 'bg-rose-100 text-rose-900 border border-rose-200'
+                            ? 'bg-amber-100 text-amber-900 border-amber-200'
+                            : r.type === 'SUINO'
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                            : 'bg-rose-100 text-rose-900 border-rose-200'
                         }`}
                       >
-                        {r.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : 'TR - TRASEIRO'}
+                        {r.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : r.type === 'SUINO' ? 'DS - SUÍNO' : 'TR - TRASEIRO'}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-slate-800 font-medium">
