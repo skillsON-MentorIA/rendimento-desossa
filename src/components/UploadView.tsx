@@ -34,7 +34,7 @@ interface UploadViewProps {
 }
 
 export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
-  const { addRecord, canUpload, currentUser, records } = useApp();
+  const { addRecord, canUpload, currentUser, records, carcassCosts } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'corrections'>('upload');
 
@@ -45,7 +45,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
   const [shift, setShift] = useState<'Turno 1' | 'Turno 2' | 'Turno 3'>('Turno 1');
   const [operatorCount, setOperatorCount] = useState<number>(20);
   const [responsibleOperator, setResponsibleOperator] = useState<string>('Marcos Silveira');
-  const [carcassCostPerKg, setCarcassCostPerKg] = useState<number>(15.50);
+  const [carcassCostPerKg, setCarcassCostPerKg] = useState<number>(15.20);
   const [preDebonedInputKg, setPreDebonedInputKg] = useState<number>(0);
   const [customDate, setCustomDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [parsedPreview, setParsedPreview] = useState<ProductionRecord | null>(null);
@@ -71,7 +71,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
         shift,
         operatorCount: opCount ?? operatorCount,
         responsibleOperator,
-        carcassCostPerKg: cost ?? carcassCostPerKg,
+        carcassCostPerKg: cost,
         customDate,
         type: typeOverride === 'AUTO' ? undefined : (typeOverride as CutType),
         preDebonedInputKg: effectivePreDeboned,
@@ -81,6 +81,10 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
         setErrorMsg('Não foi possível identificar os pesos de Matéria-Prima ou Produto Acabado neste arquivo. Verifique se o documento contém a tabela de Matéria-Prima, Produto Acabado ou o Resumo/Totalização do SisAtak RETQ010.');
         setParsedPreview(null);
         return;
+      }
+
+      if (cost === undefined) {
+        setCarcassCostPerKg(preview.carcassCostPerKg);
       }
 
       // If parser auto-detected pre-deboned meat from raw material lines and user hasn't set it yet

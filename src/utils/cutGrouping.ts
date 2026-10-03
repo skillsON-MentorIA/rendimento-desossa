@@ -122,10 +122,20 @@ export function matchGroupSuino(cut: { name: string; code?: string }): string {
   const n = cleanText(cut.name);
   const code = (cut.code || '').replace(/\D/g, '');
 
-  // Subproduto Osso Suíno: exclusivamente X-MP - OSSO SUÍNO (código 02010990005)
-  // IMPORTANTE: Produtos como "PERNIL S/OSSO" ou "PALETA S/OSSO" JAMAIS são ossos!
-  if (!/S\/\s*OSSO|SEM\s*OSSO/i.test(n)) {
-    if (/X-MP.*OSSO/i.test(n) || code.includes('02010990005') || (/OSSO/i.test(n) && !/PERNIL|PALETA|COSTELA|LOMBO|BISTECA|BARRIGA/i.test(n))) {
+  // Subproduto Osso Suíno: exclusivamente X-MP - OSSO SUÍNO (código 02010990005, 02010990010)
+  // IMPORTANTE: Produtos como "PERNIL S/OSSO" ou "PALETA S/OSSO" ou "PERNIL C/ OSSO" JAMAIS são ossos subproduto!
+  const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(n);
+  const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(n);
+
+  if (!isSemOsso && !isMeatCut) {
+    if (
+      /X-MP.*OSSO/i.test(n) ||
+      /OSSO\s+SU[IÍ]NO/i.test(n) ||
+      /OSSO\s+DA\s+DESOSSA/i.test(n) ||
+      code.includes('02010990005') ||
+      code.includes('02010990010') ||
+      (/^X-MP/i.test(n) && /OSSO/i.test(n))
+    ) {
       return 'Osso';
     }
   }

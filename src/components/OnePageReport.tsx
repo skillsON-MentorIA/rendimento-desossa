@@ -215,6 +215,50 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     .reduce((acc, c) => acc + c.totalPrice, 0);
 
   // Exact calculations synchronized with the deboning analytical table
+  const activeRecordBoneWeight = React.useMemo(() => {
+    if (!activeRecord) return 0;
+    if (activeRecord.type === 'SUINO' && activeRecord.cuts && activeRecord.cuts.length > 0) {
+      return activeRecord.cuts
+        .filter((c) => !/S\/\s*OSSO|SEM\s*OSSO/i.test(c.name) && (/X-MP.*OSSO/i.test(c.name) || c.code.includes('02010990005') || (/OSSO/i.test(c.name) && /X-MP/i.test(c.name))))
+        .reduce((acc, c) => acc + c.weightKg, 0);
+    }
+    return activeRecord.boneWeightKg;
+  }, [activeRecord]);
+
+  const activeRecordFatWeight = React.useMemo(() => {
+    if (!activeRecord) return 0;
+    if (activeRecord.type === 'SUINO') return 0;
+    return activeRecord.fatWeightKg;
+  }, [activeRecord]);
+
+  const activeRecordNonSaleableWeight = activeRecordBoneWeight + activeRecordFatWeight;
+
+  const activeRecordBonePct = activeRecord?.rawMaterialWeightKg > 0
+    ? (activeRecordBoneWeight / activeRecord.rawMaterialWeightKg) * 100
+    : 0;
+
+  const activeRecordFatPct = activeRecord?.rawMaterialWeightKg > 0
+    ? (activeRecordFatWeight / activeRecord.rawMaterialWeightKg) * 100
+    : 0;
+
+  const activeRecordNonSaleablePct = activeRecord?.rawMaterialWeightKg > 0
+    ? (activeRecordNonSaleableWeight / activeRecord.rawMaterialWeightKg) * 100
+    : 0;
+
+  const activeRecordSaleableWeight = React.useMemo(() => {
+    if (!activeRecord) return 0;
+    return Math.max(0, activeRecord.finishedProductWeightKg - activeRecordNonSaleableWeight);
+  }, [activeRecord, activeRecordNonSaleableWeight]);
+
+  const activeRecordDeboningYield = React.useMemo(() => {
+    if (!activeRecord || activeRecord.rawMaterialWeightKg <= 0) return 0;
+    const preDeboned = activeRecord.preDebonedInputKg || 0;
+    const effectiveMeat = Math.max(0, activeRecordSaleableWeight - preDeboned);
+    const carcass = (activeRecordSaleableWeight + activeRecordBoneWeight + activeRecordFatWeight + activeRecord.lossKg) || activeRecord.rawMaterialWeightKg;
+    const effectiveCarcass = Math.max(0, carcass - preDeboned);
+    return effectiveCarcass > 0 ? (effectiveMeat / effectiveCarcass) * 100 : 0;
+  }, [activeRecord, activeRecordSaleableWeight, activeRecordBoneWeight, activeRecordFatWeight]);
+
   const activeRecordTotalValue = React.useMemo(() => {
     if (!activeRecord) return 0;
     if (activeRecord.cuts && activeRecord.cuts.length > 0) {
@@ -646,13 +690,22 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
 
                   <div className="flex justify-between py-0.5 border-b border-slate-100 text-slate-600">
                     <span className="font-medium">Subproduto Osso:</span>
-                    <span className="font-mono">{formatWeightNum(activeRecord.boneWeightKg, 3)} kg ({formatPct(activeRecord.bonePct, 2)})</span>
+                    <span className="font-mono font-bold text-slate-800">
+                      {formatWeightNum(activeRecord.boneWeightKg, 3)} kg ({formatPct(activeRecord.rawMaterialWeightKg > 0 ? (activeRecord.boneWeightKg / activeRecord.rawMaterialWeightKg) * 100 : activeRecord.bonePct, 2)})
+                    </span>
                   </div>
 
-                  <div className="flex justify-between py-0.5 border-b border-slate-100 text-slate-600">
-                    <span className="font-medium">Subproduto Sebo:</span>
-                    <span className="font-mono">{formatWeightNum(activeRecord.fatWeightKg, 3)} kg ({formatPct(activeRecord.fatPct, 2)})</span>
-                  </div>
+                  {activeRecord.type !== 'SUINO' ? (
+                    <div className="flex justify-between py-0.5 border-b border-slate-100 text-slate-600">
+                      <span className="font-medium">Subproduto Sebo:</span>
+                      <span className="font-mono">{formatWeightNum(activeRecord.fatWeightKg, 3)} kg ({formatPct(activeRecord.fatPct, 2)})</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between py-0.5 border-b border-slate-100 text-slate-400">
+                      <span className="font-medium">Subproduto Sebo:</span>
+                      <span className="font-mono text-slate-400">Não aplicável (0,000 kg • 0,00%)</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Compact graphical representation */}
@@ -669,19 +722,21 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                       Cortes {Math.round((activeRecord.saleableCutsWeightKg / activeRecord.rawMaterialWeightKg) * 100)}%
                     </div>
                     <div
-                      style={{ width: `${Math.round(activeRecord.bonePct)}%` }}
+                      style={{ width: `${Math.round(activeRecord.rawMaterialWeightKg > 0 ? (activeRecord.boneWeightKg / activeRecord.rawMaterialWeightKg) * 100 : activeRecord.bonePct)}%` }}
                       className="bg-slate-400 truncate"
                       title="Osso"
                     >
-                      Osso {Math.round(activeRecord.bonePct)}%
+                      Osso {Math.round(activeRecord.rawMaterialWeightKg > 0 ? (activeRecord.boneWeightKg / activeRecord.rawMaterialWeightKg) * 100 : activeRecord.bonePct)}%
                     </div>
-                    <div
-                      style={{ width: `${Math.round(activeRecord.fatPct * 2)}%` }}
-                      className="bg-amber-500 truncate"
-                      title="Sebo"
-                    >
-                      Sebo
-                    </div>
+                    {activeRecord.type !== 'SUINO' && activeRecord.fatPct > 0 && (
+                      <div
+                        style={{ width: `${Math.round(activeRecord.fatPct * 2)}%` }}
+                        className="bg-amber-500 truncate"
+                        title="Sebo"
+                      >
+                        Sebo
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

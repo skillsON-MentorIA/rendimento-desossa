@@ -341,25 +341,25 @@ export const SuinoView: React.FC = () => {
           </div>
         </div>
 
-        {/* Subprodutos (Osso + Toucinho/Banha) */}
+        {/* Subprodutos Suínos (Exclusivamente Osso) */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
             <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
               <Bone className="w-4 h-4 text-amber-700" />
-              Subprodutos Suínos
+              Subprodutos Suínos (Apenas Osso)
             </span>
             <span className="text-[10px] font-bold bg-amber-50 text-amber-800 px-2 py-0.5 rounded">
-              {formatPct(nonSaleablePct, 2)}
+              {formatPct(bonePct, 2)}
             </span>
           </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Osso Suíno:</span>
-              <span className="font-bold text-slate-900">{formatKg(totalBone)} ({formatPct(bonePct, 2)})</span>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600 font-medium">Osso Suíno Extraído:</span>
+              <span className="font-bold text-slate-900 font-mono">{formatKg(totalBone)} ({formatPct(bonePct, 2)})</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Toucinho / Banha:</span>
-              <span className="font-bold text-slate-900">{formatKg(totalFat)} ({formatPct(fatPct, 2)})</span>
+            <div className="flex justify-between items-center text-slate-400 text-[11px] pt-1 border-t border-slate-100">
+              <span>Subproduto Sebo:</span>
+              <span className="font-mono">Inexistente na carne suína (0,00%)</span>
             </div>
           </div>
         </div>

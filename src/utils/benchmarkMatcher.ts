@@ -46,8 +46,15 @@ export function findBenchmarkForCut(
     : benchmarks;
 
   // 3. Subprodutos: Osso e Sebo
-  const isBone = /OSSO/i.test(cut.name) || cut.category === 'SUBPRODUTO_OSSO';
-  const isFat = /SEBO/i.test(cut.name) || cut.category === 'SUBPRODUTO_SEBO';
+  const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(cut.name);
+  const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(cut.name);
+  const isBone = !isSemOsso && !isMeatCut && (
+    cut.category === 'SUBPRODUTO_OSSO' ||
+    (preferredType === 'SUINO'
+      ? (/X-MP.*OSSO/i.test(cut.name) || cut.code?.includes('02010990005') || cut.code?.includes('02010990010'))
+      : /OSSO/i.test(cut.name))
+  );
+  const isFat = preferredType !== 'SUINO' && (cut.category === 'SUBPRODUTO_SEBO' || /SEBO/i.test(cut.name));
 
   if (isBone) {
     const boneBench = candidateBenchmarks.find((b) => /OSSO/i.test(b.name) || /OSSO/i.test(b.code))
@@ -98,7 +105,7 @@ export function findBenchmarkForCut(
     // Acém
     { regex: /ACEM/i, matcher: (b) => /ACEM/i.test(b.name) || /01010990004/i.test(b.code) },
     // Paleta
-    { regex: /PALETA/i, matcher: (b) => /PALETA/i.test(b.name) || /01010990005/i.test(b.code) },
+    { regex: /PALETA/i, matcher: (b) => /PALETA/i.test(b.name) || /01010990005/i.test(b.code) || /PALETA/i.test(b.code) },
     // Maca Peito
     { regex: /MACA\s*PEITO/i, matcher: (b) => /MACA/i.test(b.name) || /01010990063/i.test(b.code) },
     // Peito Bovino Geral
@@ -111,6 +118,7 @@ export function findBenchmarkForCut(
     },
     // Suíno (DS)
     { regex: /PERNIL/i, matcher: (b) => /PERNIL/i.test(b.name) || /PERNIL/i.test(b.code) },
+    { regex: /COPA\s*LOMBO|SOBREPALETA/i, matcher: (b) => /COPA/i.test(b.name) || /SOBREPALETA/i.test(b.name) },
     { regex: /LOMBO/i, matcher: (b) => /LOMBO/i.test(b.name) || /LOMBO/i.test(b.code) },
     { regex: /COSTELA|COSTELINHA/i, matcher: (b) => /COSTELA/i.test(b.name) || /COSTELA/i.test(b.code) },
     { regex: /BARRIGA|PANCETA/i, matcher: (b) => /BARRIGA|PANCETA/i.test(b.name) || /BARRIGA/i.test(b.code) },

@@ -47,7 +47,7 @@ export function parseSisAtakReport(
   if (extraParams.type) {
     type = extraParams.type;
   } else {
-    const suinoHits = (rawText.match(/SU[IÍ]NO|DS\s*-\s*SU[IÍ]NO|1110003|Total:\s*DS|CARCA[ÇC]A\s+SU[IÍ]NA|PERNIL|PALETA\s+SU|LOMBO|BISTECA|PANCETA|COSTELINHA/gi) || []).length;
+    const suinoHits = (rawText.match(/SU[IÍ]NO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCA[ÇC]A|MATRIZ|SU\s*-\s*SU[IÍ]NO|DS\s*-\s*SU[IÍ]NO|1110003|Total:\s*(?:SU|DS)|Total Grupo:\s*(?:SU|DS)|PERNIL|PALETA\s*S\/|LOMBO|BISTECA|PANCETA|COSTELINHA/gi) || []).length;
     const dianteiroHits = (rawText.match(/DIANTEIRO|DT\s*-\s*DIANTEIRO|1110002|Total:\s*DT/gi) || []).length;
     const traseiroHits = (rawText.match(/TRASEIRO|TR\s*-\s*TRASEIRO|1110001|Total:\s*TR/gi) || []).length;
     if (suinoHits > dianteiroHits && suinoHits > traseiroHits) {
@@ -269,7 +269,7 @@ export function parseSisAtakReport(
     }
 
     // Check if line contains weight & boxes: e.g. "CXGG - ALCATRA ... 440,320 KG 16,000 CX ... 39,00 17.172,48 R$"
-    const cutMatch = rest.match(/^(.*?)\s+(\d{1,3}(?:\.\d{3})*,\d{3})\s*(?:KG)?\s+(\d{1,3}(?:\.\d{3})*,\d{3})\s*(?:CX)?(.*)$/i);
+    const cutMatch = rest.match(/^(.*?)\s+(\d{1,3}(?:\.\d{3})*,\d{3})\s*(?:KG)?\s+(\d{1,3}(?:\.\d{3})*(?:,\d{1,3})?)\s*(?:CX|UN)?(.*)$/i);
     if (cutMatch) {
       const name = cutMatch[1].trim();
       const weightKg = parseBrNumber(cutMatch[2]);
@@ -297,15 +297,26 @@ export function parseSisAtakReport(
       // Atenção: Produtos com "S/OSSO" ou "S/ OSSO" ou "SEM OSSO" (como PERNIL S/OSSO, PALETA S/OSSO)
       // NUNCA são subprodutos osso - são carnes vendáveis nobres de alto valor!
       const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(name);
+      const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(name);
 
       let isBone = false;
       let isFat = false;
 
       if (type === 'SUINO') {
         // Conforme instrução expressa do cliente:
-        // Considere como OSSO exclusivamente o subproduto com código/descrição X-MP - OSSO SUÍNO (ex: 02010990005-0)
-        isBone = !isSemOsso && (/X-MP.*OSSO/i.test(name) || /X-MP.*OSSO/i.test(line) || code.includes('02010990005') || (/OSSO/i.test(name) && /X-MP/i.test(name)));
-        // Em suínos, toucinho e gorduras de rama são itens comerciais vendidos com preço de PA
+        // O ÚNICO subproduto da carne suína é o OSSO!
+        // Considere como OSSO exclusivamente o subproduto com código/descrição X-MP - OSSO SUÍNO (ex: 02010990005, 02010990010)
+        // Carnes vendáveis (como PERNIL S/OSSO, PALETA S/OSSO ou cortes com osso comercializáveis) JAMAIS são subproduto osso!
+        isBone = !isSemOsso && !isMeatCut && (
+          /X-MP.*OSSO/i.test(name) ||
+          /X-MP.*OSSO/i.test(line) ||
+          /OSSO\s+SU[IÍ]NO/i.test(name) ||
+          /OSSO\s+DA\s+DESOSSA/i.test(name) ||
+          code.includes('02010990005') ||
+          code.includes('02010990010') ||
+          (/^X-MP/i.test(name) && /OSSO/i.test(name))
+        );
+        // Em suínos, NÃO EXISTE SUBPRODUTO SEBO! Toucinho, banha e papada são produtos acabados vendáveis com preço de PA
         isFat = false;
       } else {
         // Bovino (DT/TR): osso subproduto descartável (desde que não seja carne S/OSSO)
@@ -383,18 +394,18 @@ export function parseSisAtakReport(
   const fatCuts = cuts.filter((c) => c.category === 'SUBPRODUTO_SEBO');
 
   let boneWeightKg = boneCuts.reduce((a, b) => a + b.weightKg, 0);
-  let fatWeightKg = fatCuts.reduce((a, b) => a + b.weightKg, 0);
+  let fatWeightKg = isSuino ? 0 : fatCuts.reduce((a, b) => a + b.weightKg, 0);
 
   // If cuts were not present in report (e.g. only summary was uploaded)
   // use industry standard proportions for display until full cuts are provided
   if (cuts.length === 0 && rawMaterialWeightKg > 0) {
     boneWeightKg = isSuino
-      ? rawMaterialWeightKg * 0.0350
+      ? rawMaterialWeightKg * 0.0917 // Padrão real do frigorífico (~9,17%)
       : isTraseiro
       ? rawMaterialWeightKg * 0.2055
       : rawMaterialWeightKg * 0.2116;
     fatWeightKg = isSuino
-      ? rawMaterialWeightKg * 0.0450
+      ? 0 // Suíno não tem subproduto sebo
       : isTraseiro
       ? rawMaterialWeightKg * 0.0220
       : rawMaterialWeightKg * 0.0081;
@@ -403,7 +414,7 @@ export function parseSisAtakReport(
   const nonSaleableWeightKg = boneWeightKg + fatWeightKg;
   const nonSaleablePct = rawMaterialWeightKg > 0 ? (nonSaleableWeightKg / rawMaterialWeightKg) * 100 : 0;
   const bonePct = rawMaterialWeightKg > 0 ? (boneWeightKg / rawMaterialWeightKg) * 100 : 0;
-  const fatPct = rawMaterialWeightKg > 0 ? (fatWeightKg / rawMaterialWeightKg) * 100 : 0;
+  const fatPct = isSuino ? 0 : (rawMaterialWeightKg > 0 ? (fatWeightKg / rawMaterialWeightKg) * 100 : 0);
 
   const saleableCutsWeightKg = Math.max(0, finishedProductWeightKg - nonSaleableWeightKg);
 

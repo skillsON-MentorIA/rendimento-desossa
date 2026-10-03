@@ -5,7 +5,7 @@ import {
   INITIAL_PRODUCTION_RECORDS,
   INITIAL_USERS
 } from '../data/initialData';
-import { FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
+import { CutItem, CutType, FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
 import { CalculatedSummary, calculateSummary } from '../utils/calculations';
 import {
   syncRecordsToSupabase,
@@ -90,16 +90,29 @@ const DEFAULT_CARCASS_COSTS: CarcassCostsState = {
 /**
  * Garante que produtos sem osso (como PERNIL S/OSSO, PALETA S/OSSO) não sejam contabilizados
  * incorretamente como subproduto osso em lotes suínos já existentes no banco local.
+ * Garante também que a carne suína tenha como ÚNICO subproduto o OSSO (Sebo = 0 kg e 0,00%).
  */
 function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number = 9.30): ProductionRecord {
-  if (r.type !== 'SUINO' || !r.cuts || r.cuts.length === 0) return r;
+  // Verificar se é suíno mesmo que tenha sido classificado incorretamente
+  const isActuallySuino = r.type === 'SUINO' ||
+    /SU[IÍ]NO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCA[ÇC]A|MATRIZ/i.test(r.rawMaterialDesc || '') ||
+    r.rawMaterialCode?.startsWith('2110') ||
+    (r.cuts && r.cuts.some((c) => /PERNIL|PALETA\s+SU|SU[IÍ]NO/i.test(c.name)));
+
+  if (!isActuallySuino || !r.cuts || r.cuts.length === 0) return r;
+
+  const type: CutType = 'SUINO';
 
   const updatedCuts = r.cuts.map((cut) => {
     const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(cut.name);
-    const isBone = !isSemOsso && (
+    const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(cut.name);
+    const isBone = !isSemOsso && !isMeatCut && (
       /X-MP.*OSSO/i.test(cut.name) ||
+      /OSSO\s+SU[IÍ]NO/i.test(cut.name) ||
+      /OSSO\s+DA\s+DESOSSA/i.test(cut.name) ||
       cut.code.includes('02010990005') ||
-      (/OSSO/i.test(cut.name) && /X-MP/i.test(cut.name))
+      cut.code.includes('02010990010') ||
+      (/^X-MP/i.test(cut.name) && /OSSO/i.test(cut.name))
     );
     const category: CutItem['category'] = isBone
       ? 'SUBPRODUTO_OSSO'
@@ -114,11 +127,15 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
   });
 
   const boneWeightKg = updatedCuts.filter((c) => c.category === 'SUBPRODUTO_OSSO').reduce((a, b) => a + b.weightKg, 0);
-  const fatWeightKg = 0; // Em suínos, toucinho e gorduras são cortes vendáveis
-  const nonSaleableWeightKg = boneWeightKg + fatWeightKg;
+  const fatWeightKg = 0; // Na carne suína, o ÚNICO subproduto é o OSSO!
+  const nonSaleableWeightKg = boneWeightKg;
   const saleableCutsWeightKg = Math.max(0, r.finishedProductWeightKg - nonSaleableWeightKg);
 
-  const calculatedCarcass = saleableCutsWeightKg + boneWeightKg + fatWeightKg + r.lossKg;
+  const bonePct = r.rawMaterialWeightKg > 0 ? (boneWeightKg / r.rawMaterialWeightKg) * 100 : 0;
+  const fatPct = 0; // Sebo é inexistente na suinocultura (0,00%)
+  const nonSaleablePct = bonePct;
+
+  const calculatedCarcass = saleableCutsWeightKg + boneWeightKg + r.lossKg;
   const totalCarcassWeightKg = calculatedCarcass > 0 ? calculatedCarcass : r.rawMaterialWeightKg;
 
   const preDebonedInputKg = r.preDebonedInputKg || 0;
@@ -126,7 +143,7 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
   const carcassWithBoneWeightKg = Math.max(0, totalCarcassWeightKg - preDebonedInputKg);
   const deboningYieldNetPct = carcassWithBoneWeightKg > 0 ? (deboningEffectiveMeatKg / carcassWithBoneWeightKg) * 100 : 0;
 
-  // Se o lote suíno herdou por engano o custo bovino de 15.50, calibrar para o custo suíno correto
+  // Se o lote suíno herdou por engano o custo bovino de 15.20/15.50/21.80, calibrar para o custo suíno correto
   const costPerKg = (r.carcassCostPerKg >= 15.00) ? currentSuinoCost : r.carcassCostPerKg;
   const totalCarcassCost = r.rawMaterialWeightKg * costPerKg;
   const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
@@ -134,11 +151,15 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
 
   return {
     ...r,
+    type,
     cuts: updatedCuts,
     boneWeightKg,
-    fatWeightKg,
+    fatWeightKg: 0,
     nonSaleableWeightKg,
     saleableCutsWeightKg,
+    bonePct,
+    fatPct: 0,
+    nonSaleablePct,
     deboningYieldNetPct,
     carcassCostPerKg: costPerKg,
     totalCarcassCost,

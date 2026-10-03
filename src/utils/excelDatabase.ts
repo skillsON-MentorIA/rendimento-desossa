@@ -242,10 +242,12 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
 
           const desc = String(c['Descrição do Corte'] || c['Descricao'] || c['Nome'] || '').toUpperCase();
           const categoryRaw = String(c['Categoria'] || '').toUpperCase();
+          const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/.test(desc);
+          const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/.test(desc);
           
           let category: CutItem['category'] = 'DIANTEIRO';
           let isNonSaleable = false;
-          if (categoryRaw.includes('OSSO') || desc.includes('OSSO')) {
+          if (!isSemOsso && !isMeatCut && (categoryRaw.includes('OSSO') || /X-MP.*OSSO/.test(desc) || desc.includes('OSSO SU') || desc.includes('OSSO DO'))) {
             category = 'SUBPRODUTO_OSSO';
             isNonSaleable = true;
           } else if (categoryRaw.includes('SEBO') || desc.includes('SEBO')) {
@@ -255,6 +257,8 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
             category = 'NOBRE';
           } else if (categoryRaw.includes('RECORTE') || desc.includes('RECORTE')) {
             category = 'RECORTE';
+          } else if (String(c['Tipo'] || '').includes('SU') || desc.includes('SUINO') || desc.includes('SUÍNO')) {
+            category = 'SUINO';
           } else if (String(c['Tipo'] || '').includes('TR')) {
             category = 'TRASEIRO';
           }
@@ -299,13 +303,14 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
           const cuts = cutsByLoteId[id] || [];
 
           // Subproducts and saleable cuts
+          const isSuino = type === 'SUINO';
           const boneWeightKg = Number(row['Subprodutos Osso (Kg)'] || 0) || cuts.filter((c) => c.category === 'SUBPRODUTO_OSSO').reduce((acc, c) => acc + c.weightKg, 0);
-          const fatWeightKg = Number(row['Subprodutos Sebo (Kg)'] || 0) || cuts.filter((c) => c.category === 'SUBPRODUTO_SEBO').reduce((acc, c) => acc + c.weightKg, 0);
+          const fatWeightKg = isSuino ? 0 : (Number(row['Subprodutos Sebo (Kg)'] || 0) || cuts.filter((c) => c.category === 'SUBPRODUTO_SEBO').reduce((acc, c) => acc + c.weightKg, 0));
           const nonSaleableWeightKg = boneWeightKg + fatWeightKg;
           const saleableCutsWeightKg = Number(row['Carnes Vendáveis (Kg)'] || Math.max(0, finishedProductWeightKg - nonSaleableWeightKg));
 
           const bonePct = rawMaterialWeightKg > 0 ? (boneWeightKg / rawMaterialWeightKg) * 100 : 0;
-          const fatPct = rawMaterialWeightKg > 0 ? (fatWeightKg / rawMaterialWeightKg) * 100 : 0;
+          const fatPct = isSuino ? 0 : (rawMaterialWeightKg > 0 ? (fatWeightKg / rawMaterialWeightKg) * 100 : 0);
           const nonSaleablePct = rawMaterialWeightKg > 0 ? (nonSaleableWeightKg / rawMaterialWeightKg) * 100 : 0;
 
           // Peso total da carcaça = Carnes + Osso + Sebo + Quebra
@@ -316,7 +321,7 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
           const deboningYieldNetPct = totalCarcass > 0 ? (saleableCutsWeightKg / totalCarcass) * 100 : 0;
           const totalYieldPct = rawMaterialWeightKg > 0 ? (finishedProductWeightKg / rawMaterialWeightKg) * 100 : 0;
 
-          const carcassCostPerKg = Number(row['Custo Carcaça (R$/Kg)'] || (type === 'TRASEIRO' ? 21.80 : type === 'SUINO' ? 11.50 : 15.20));
+          const carcassCostPerKg = Number(row['Custo Carcaça (R$/Kg)'] || (type === 'TRASEIRO' ? 21.80 : type === 'SUINO' ? 9.30 : 15.20));
           const totalCarcassCost = Number(row['Custo Total Carcaça (R$)'] || (rawMaterialWeightKg * carcassCostPerKg));
           const finishedProductTotalValue = Number(row['Faturamento PA (R$)'] || cuts.reduce((acc, c) => acc + c.totalPrice, 0));
           const grossProfitValue = Number(row['Lucro Bruto (R$)'] || (finishedProductTotalValue - totalCarcassCost));

@@ -689,8 +689,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center justify-between whitespace-nowrap">
               <span className="text-slate-500">Sebo:</span>
               <span className="text-slate-800">
-                <strong className="font-bold">{formatKg(summary.totalFatKg, 0)}</strong>{' '}
-                <span className="text-slate-600 font-mono text-[10px] font-bold">({formatPct(summary.avgFatPct, 2)})</span>
+                {filters.type === 'SUINO' ? (
+                  <span className="text-slate-400 font-mono text-[10px]">N/A (0,00%)</span>
+                ) : (
+                  <>
+                    <strong className="font-bold">{formatKg(summary.totalFatKg, 0)}</strong>{' '}
+                    <span className="text-slate-600 font-mono text-[10px] font-bold">({formatPct(summary.avgFatPct, 2)})</span>
+                  </>
+                )}
               </span>
             </div>
           </div>
@@ -1112,7 +1118,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Balanço de Massa & Sub Produtos
               </h3>
               <p className="text-xs text-slate-500">
-                Aproveitamento de carcaça: Cortes Vendáveis vs Sub Produtos (Osso e Sebo)
+                Aproveitamento de carcaça: Cortes Vendáveis vs Sub Produtos {filters.type === 'SUINO' ? '(Exclusivamente Osso)' : '(Osso e Sebo)'}
               </p>
             </div>
             <span className="text-xs font-bold px-2 py-1 rounded bg-slate-100 text-slate-700">
@@ -1128,7 +1134,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Cortes Vendáveis (Nobre/Especial/Recorte)
                 </span>
-                <span className="text-slate-900">
+                <span className="text-slate-900 font-mono font-bold">
                   {formatKg(summary.totalSaleableCutsKg)} ({formatPct(summary.avgSaleableYieldOnCarcassPct)})
                 </span>
               </div>
@@ -1145,9 +1151,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex justify-between text-xs font-semibold mb-1">
                 <span className="text-slate-700 flex items-center gap-1">
                   <Bone className="w-3.5 h-3.5 text-slate-500" />
-                  Osso Total Extraído
+                  Osso Total Extraído {filters.type === 'SUINO' && '(Único Subproduto Suíno)'}
                 </span>
-                <span className="text-slate-900">
+                <span className="text-slate-900 font-mono font-bold">
                   {formatKg(summary.totalBoneKg)} ({formatPct(summary.avgBonePct)})
                 </span>
               </div>
@@ -1159,24 +1165,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             </div>
 
-            {/* Bar 3: Sebo / Gordura industrial */}
-            <div>
-              <div className="flex justify-between text-xs font-semibold mb-1">
-                <span className="text-amber-800 flex items-center gap-1">
-                  <Flame className="w-3.5 h-3.5 text-amber-600" />
-                  Sebo e Gordura Industrial
-                </span>
-                <span className="text-slate-900">
-                  {formatKg(summary.totalFatKg)} ({formatPct(summary.avgFatPct)})
-                </span>
+            {/* Bar 3: Sebo / Gordura industrial (Apenas Bovinos) */}
+            {filters.type !== 'SUINO' && (
+              <div>
+                <div className="flex justify-between text-xs font-semibold mb-1">
+                  <span className="text-amber-800 flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5 text-amber-600" />
+                    Sebo e Gordura Industrial
+                  </span>
+                  <span className="text-slate-900 font-mono font-bold">
+                    {formatKg(summary.totalFatKg)} ({formatPct(summary.avgFatPct)})
+                  </span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 rounded-full"
+                    style={{ width: `${Math.min(summary.avgFatPct * 5, 100)}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  className="h-full bg-amber-500 rounded-full"
-                  style={{ width: `${Math.min(summary.avgFatPct * 10, 100)}%` }}
-                />
-              </div>
-            </div>
+            )}
 
             {/* Bar 4: Quebra Operacional */}
             <div>

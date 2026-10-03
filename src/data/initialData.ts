@@ -141,7 +141,7 @@ export const INITIAL_MARKET_BENCHMARKS: MarketBenchmark[] = [
   { code: '02010010070-0', name: 'Copa Lombo / Sobrepaleta', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 22.50, tolerancePct: 0.4 },
   { code: '02010010080-0', name: 'Filé Mignon Suíno', type: 'SUINO', expectedYieldPct: 1.80, standardPricePerKg: 25.00, tolerancePct: 0.2 },
   { code: '02010010090-0', name: 'Recorte Suíno Industrial', type: 'SUINO', expectedYieldPct: 4.00, standardPricePerKg: 11.50, tolerancePct: 0.6 },
-  { code: '02010990020-0', name: 'Toucinho / Banha (Subproduto)', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 5.50, tolerancePct: 0.5 },
+  { code: '02010990020-0', name: 'Toucinho / Banha Resf', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 5.50, tolerancePct: 0.5 },
   { code: '02010990010-0', name: 'Osso Suíno (Subproduto)', type: 'SUINO', expectedYieldPct: 3.50, standardPricePerKg: 0.80, tolerancePct: 0.5 }
 ];
 
@@ -603,8 +603,8 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
     rawMaterialWeightKg: 12850.000,
     rawMaterialBoxes: 140,
     rawMaterialAvgWeightKg: 91.785,
-    carcassCostPerKg: 11.50,
-    totalCarcassCost: 147775.00,
+    carcassCostPerKg: 9.30,
+    totalCarcassCost: 12850.000 * 9.30, // R$ 119.505,00
     finishedProductWeightKg: 12659.550,
     finishedProductBoxes: 310,
     finishedProductTotalValue: 248596.12,
@@ -618,23 +618,23 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
       { id: 'rec_ds_20260827_7', code: '02010010070-0', name: 'CXGG - COPA LOMBO / SOBREPALETA RESF', weightKg: 578.250, boxesCount: 14, unitPrice: 22.50, totalPrice: 13010.63, yieldActualPct: 4.50, yieldExpectedPct: 4.50, category: 'SUINO' },
       { id: 'rec_ds_20260827_8', code: '02010010080-0', name: 'CXGG - FILE MIGNON SUINO RESF', weightKg: 231.300, boxesCount: 6, unitPrice: 25.00, totalPrice: 5782.50, yieldActualPct: 1.80, yieldExpectedPct: 1.80, category: 'SUINO' },
       { id: 'rec_ds_20260827_9', code: '02010010090-0', name: 'W-MP - RECORTE SUINO INDUSTRIAL', weightKg: 514.000, boxesCount: 13, unitPrice: 11.50, totalPrice: 5911.00, yieldActualPct: 4.00, yieldExpectedPct: 4.00, category: 'RECORTE' },
-      { id: 'rec_ds_20260827_10', code: '02010990020-0', name: 'X-MP - TOUCINHO E BANHA SUINA RESF', weightKg: 578.250, boxesCount: 12, unitPrice: 5.50, totalPrice: 3180.38, yieldActualPct: 4.50, yieldExpectedPct: 4.50, isNonSaleable: true, category: 'SUBPRODUTO_SEBO' },
+      { id: 'rec_ds_20260827_10', code: '02010990020-0', name: 'X-MP - TOUCINHO E BANHA SUINA RESF', weightKg: 578.250, boxesCount: 12, unitPrice: 5.50, totalPrice: 3180.38, yieldActualPct: 4.50, yieldExpectedPct: 4.50, isNonSaleable: false, category: 'SUINO' },
       { id: 'rec_ds_20260827_11', code: '02010990010-0', name: 'X-MP - OSSO SUINO DA DESOSSA', weightKg: 449.750, boxesCount: 10, unitPrice: 0.80, totalPrice: 359.80, yieldActualPct: 3.50, yieldExpectedPct: 3.50, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' }
     ],
     lossKg: 190.450,
     lossPct: 1.482,
-    saleableCutsWeightKg: 11631.550,
-    nonSaleableWeightKg: 1028.000,
+    saleableCutsWeightKg: 12659.550 - 449.750, // 12.209,80 kg
+    nonSaleableWeightKg: 449.750,
     boneWeightKg: 449.750,
-    fatWeightKg: 578.250,
-    nonSaleablePct: 8.00,
-    bonePct: 3.50,
-    fatPct: 4.50,
-    deboningYieldNetPct: (11631.550 / 12850.000) * 100, // 90.52%
+    fatWeightKg: 0,
+    nonSaleablePct: (449.750 / 12850.000) * 100, // 3.50%
+    bonePct: (449.750 / 12850.000) * 100, // 3.50%
+    fatPct: 0.00,
+    deboningYieldNetPct: ((12659.550 - 449.750) / 12850.000) * 100, // 95.02%
     totalYieldPct: 98.52,
     productivityKgPerPerson: 713.89,
-    grossProfitValue: 100821.12,
-    profitMarginPct: 40.56,
+    grossProfitValue: 248596.12 - (12850.000 * 9.30),
+    profitMarginPct: ((248596.12 - (12850.000 * 9.30)) / 248596.12) * 100,
     notes: 'Primeiro lote oficial de Desossa Suína (DS) registrado no sistema.'
   }
 ];
