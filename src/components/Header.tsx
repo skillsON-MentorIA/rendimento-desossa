@@ -1,7 +1,7 @@
-import React from 'react';
 import {
   Menu,
   FileSpreadsheet,
+  Layers,
   PanelLeftClose,
   PanelLeftOpen,
   LogOut
@@ -14,14 +14,17 @@ interface HeaderProps {
   onToggleCollapse: () => void;
   isCollapsed: boolean;
   onNavigateToOnePage: () => void;
+  onNavigateToCortes?: () => void;
   onOpenLogin?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  activeTab,
   onToggleMobileMenu,
   onToggleCollapse,
   isCollapsed,
   onNavigateToOnePage,
+  onNavigateToCortes,
 }) => {
   const { currentUser, logout } = useApp();
 
@@ -65,15 +68,30 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Section: One Page Report & User Session */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToOnePage}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-900 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            title="Gerar One Page Report A4 Paisagem"
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+              activeTab === 'report' ? 'bg-rose-950 ring-2 ring-rose-400 font-bold' : 'bg-rose-900 hover:bg-rose-800'
+            }`}
+            title="Abrir One Page Report Geral com todos os cortes e valores financeiros"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span className="hidden sm:inline">One Page Report</span>
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">OPR Geral</span>
           </button>
+
+          {onNavigateToCortes && (
+            <button
+              onClick={onNavigateToCortes}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+                activeTab === 'report_cortes' ? 'bg-blue-950 ring-2 ring-blue-400 font-bold' : 'bg-blue-800 hover:bg-blue-700'
+              }`}
+              title="Abrir One Page Report Cortes (Análise consolidada por tipos de cortes vs padrão de mercado)"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">OPR Cortes</span>
+            </button>
+          )}
 
           {currentUser && (
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200">

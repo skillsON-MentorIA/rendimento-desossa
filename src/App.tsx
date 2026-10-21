@@ -14,6 +14,7 @@ import { CostelaView } from './components/CostelaView';
 import { SuinoView } from './components/SuinoView';
 import { UploadView } from './components/UploadView';
 import { OnePageReport } from './components/OnePageReport';
+import { OnePageReportCortes } from './components/OnePageReportCortes';
 import { SettingsView } from './components/SettingsView';
 import { AdminView } from './components/AdminView';
 import { LoginScreen } from './components/LoginScreen';
@@ -51,14 +52,14 @@ const MainLayout: React.FC = () => {
 
   return (
     <div
-      className="min-h-screen bg-slate-100 flex flex-col lg:flex-row text-slate-800 font-sans antialiased selection:bg-rose-900 selection:text-white relative"
+      className="min-h-screen bg-slate-100 print:bg-white print:min-h-0 flex flex-col lg:flex-row text-slate-800 font-sans antialiased selection:bg-rose-900 selection:text-white relative"
     >
       {/* Sidebar - In-flow on desktop (no overlay!), drawer on mobile */}
       <Sidebar
         activeTab={currentTab}
         setActiveTab={(tab: string) => {
           setCurrentTab(tab);
-          if (tab !== 'report') setSelectedRecordForReport(null);
+          if (tab !== 'report' && tab !== 'report_cortes') setSelectedRecordForReport(null);
         }}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         isMobileOpen={isMobileMenuOpen}
@@ -76,11 +77,12 @@ const MainLayout: React.FC = () => {
           onToggleCollapse={handleToggleCollapse}
           isCollapsed={sidebarCollapsed}
           onNavigateToOnePage={() => setCurrentTab('report')}
+          onNavigateToCortes={() => setCurrentTab('report_cortes')}
           onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
         {/* Dynamic View Body */}
-        <main className="flex-1 p-4 sm:p-6 max-w-7xl w-full mx-auto overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 print:p-0 print:m-0 print:max-w-none print:w-full print:bg-white max-w-7xl w-full mx-auto overflow-y-auto">
           {currentTab === 'dashboard' && (
             <DashboardView
               onSelectRecord={(recordId: string) => {
@@ -108,7 +110,17 @@ const MainLayout: React.FC = () => {
           )}
 
           {currentTab === 'report' && (
-            <OnePageReport selectedRecordId={selectedRecordForReport} />
+            <OnePageReport
+              selectedRecordId={selectedRecordForReport}
+              onNavigateToCortesReport={() => setCurrentTab('report_cortes')}
+            />
+          )}
+
+          {currentTab === 'report_cortes' && (
+            <OnePageReportCortes
+              selectedRecordId={selectedRecordForReport}
+              onNavigateToGeneralReport={() => setCurrentTab('report')}
+            />
           )}
 
           {(currentTab === 'admin' || currentTab === 'settings') && <AdminView />}

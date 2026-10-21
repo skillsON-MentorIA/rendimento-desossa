@@ -40,10 +40,12 @@ import { DeleteRecordModal } from './DeleteRecordModal';
 
 interface OnePageReportProps {
   selectedRecordId?: string | null;
+  onNavigateToCortesReport?: () => void;
 }
 
 export const OnePageReport: React.FC<OnePageReportProps> = ({
   selectedRecordId,
+  onNavigateToCortesReport,
 }) => {
   const {
     records,
@@ -194,28 +196,45 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     if (!activeRecord || !activeRecord.cuts) return [];
     return [...activeRecord.cuts]
       .filter((c) => {
-        if (c.category === 'SUBPRODUTO_OSSO' || c.category === 'SUBPRODUTO_SEBO') return false;
-        if (c.isNonSaleable) return false;
-        const isBone = /X-MP.*OSSO/i.test(c.name) || /OSSO.*DESOSSA/i.test(c.name) || (activeRecord.type !== 'SUINO' && /OSSO/i.test(c.name) && !/S\/\s*OSSO|SEM\s*OSSO/i.test(c.name));
-        const isFat = activeRecord.type !== 'SUINO' && /SEBO/i.test(c.name);
-        return !isBone && !isFat;
+        // REGRA OFICIAL SOLICITADA PELA DIRETORIA:
+        // Considerar como OSSO na soma do subproduto Osso SOMENTE os registros no relatório ATAK que tenham o código/prefixo X-MP.
+        // Produtos vendáveis feitos de osso (ex: "CXGG - OSSO PATINHO BOV CONG") NÃO possuem o código X-MP
+        // e portanto NÃO são subprodutos (devem ser tratados como produtos vendáveis normais).
+        const hasXMP = /^X-MP/i.test(c.name) || /X-MP/i.test(c.code);
+        const isBoneSubproduct = hasXMP && /OSSO/i.test(c.name) && !/S\/\s*OSSO|SEM\s*OSSO/i.test(c.name);
+        const isFat = activeRecord.type !== 'SUINO' && (/SEBO/i.test(c.name) || c.category === 'SUBPRODUTO_SEBO');
+
+        if (isBoneSubproduct || isFat) return false;
+        if (!hasXMP && /OSSO/i.test(c.name) && !isFat) {
+          // É produto de osso vendável comercializável (ex: CXGG - OSSO PATINHO BOV CONG)
+          return true;
+        }
+        if (c.category === 'SUBPRODUTO_OSSO' || c.category === 'SUBPRODUTO_SEBO' || c.isNonSaleable) {
+          return false;
+        }
+        return true;
       })
-      .sort((a, b) => b.weightKg - a.weightKg);
+      .sort((a, b) => {
+        // ORDENAÇÃO POR DESCRIÇÃO DO CORTE EM ORDEM ALFABÉTICA (conforme solicitação explícita):
+        // Remove prefixos como CXGG -, MP -, W-MP - para ordenar pelo nome real do corte (Alcatra, Contra Filé, etc.),
+        // facilitando a localização e agrupando todos os cortes similares na conferência diária.
+        const cleanNameA = a.name.replace(/^(CXGG - |MP - |W-MP - |X-MP - )/i, '').trim();
+        const cleanNameB = b.name.replace(/^(CXGG - |MP - |W-MP - |X-MP - )/i, '').trim();
+        return cleanNameA.localeCompare(cleanNameB, 'pt-BR', { sensitivity: 'base' });
+      });
   }, [activeRecord]);
 
   // Diretoria: APRESENTAR TODOS OS CORTES DE FORMA SEPARADA (Sem "Demais Cortes")
   const displayedCuts = saleableCuts;
 
-  // 2. Subproduto Osso
+  // 2. Subproduto Osso (somente os registros no relatório ATAK que tenham o código X-MP)
   const boneCutsList = React.useMemo(() => {
     if (!activeRecord || !activeRecord.cuts) return [];
     return activeRecord.cuts.filter((c) => {
-      if (c.category === 'SUBPRODUTO_OSSO') return true;
       if (/S\/\s*OSSO|SEM\s*OSSO/i.test(c.name)) return false;
-      if (activeRecord.type === 'SUINO') {
-        return /X-MP.*OSSO/i.test(c.name) || /OSSO.*DESOSSA/i.test(c.name) || c.code.includes('02010990005') || c.code.includes('02010990010');
-      }
-      return /OSSO/i.test(c.name);
+      const hasXMP = /^X-MP/i.test(c.name) || /X-MP/i.test(c.code);
+      // REGRA: Considerar como OSSO na soma do subproduto Osso SOMENTE os registros com o código X-MP
+      return hasXMP && /OSSO/i.test(c.name);
     });
   }, [activeRecord]);
 
@@ -273,7 +292,13 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     return saleableCuts.reduce((acc, c) => acc + c.totalPrice, 0);
   }, [saleableCuts]);
 
-  const totalSaleableWeight = activeRecord.saleableCutsWeightKg;
+  const totalSaleableWeight = React.useMemo(() => {
+    if (saleableCuts.length > 0) {
+      return saleableCuts.reduce((acc, c) => acc + c.weightKg, 0);
+    }
+    return activeRecord.saleableCutsWeightKg;
+  }, [saleableCuts, activeRecord.saleableCutsWeightKg]);
+
   const totalSaleableYieldPct = activeRecord.rawMaterialWeightKg > 0 ? (totalSaleableWeight / activeRecord.rawMaterialWeightKg) * 100 : 0;
   const totalSaleableCost = totalSaleableWeight * activeRecord.carcassCostPerKg;
   const totalSaleableGrossProfit = totalSaleableCutsValue - totalSaleableCost;
@@ -317,7 +342,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
   const isLargeBatch = displayedCuts.length > 15;
 
   return (
-    <div className="space-y-4 pb-12">
+    <div className="space-y-4 pb-12 print:p-0 print:m-0 print:space-y-0 print:pb-0">
       {/* Top action bar (Hidden when printing) */}
       <div className="print:hidden flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -460,6 +485,19 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
           )}
 
+          {/* Segundo Botão: One Page Report Cortes (Consolidado por Tipo) */}
+          {onNavigateToCortesReport && (
+            <button
+              type="button"
+              onClick={onNavigateToCortesReport}
+              className="px-3 py-1.5 bg-blue-800 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+              title="Abrir o novo One Page Report Cortes (Análise consolidada por tipos de cortes vs padrão de mercado)"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>One Page Report Cortes</span>
+            </button>
+          )}
+
           {/* Buttons: Print & Export */}
           <button
             type="button"
@@ -524,10 +562,10 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
         A4 PORTRAIT PAGE CONTAINER 
         Calibrated with exact portrait proportions and printable height
       */}
-      <div className="flex justify-center overflow-x-auto p-1 bg-slate-200/60 rounded-xl print:p-0 print:bg-transparent">
+      <div className="flex justify-center overflow-x-auto p-0 sm:p-2 bg-white rounded-xl print:p-0 print:m-0 print:bg-white print-page-wrapper">
         <div
           id="one-page-report-canvas"
-          className="one-page-report-sheet bg-white text-slate-900 shadow-lg border border-slate-300 print:border-none print:shadow-none mx-auto p-3.5 sm:p-4 print:p-0 flex flex-col justify-between"
+          className="one-page-report-sheet bg-white text-slate-900 border border-slate-400 print:border print:border-slate-500 rounded-sm print:rounded-none mx-auto p-3.5 sm:p-4 print:p-2.5 flex flex-col justify-between"
           style={{
             width: '100%',
             maxWidth: '850px',
@@ -559,7 +597,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
 
             {/* Context metadata ribbon */}
-            <div className="mt-1 pt-1 border-t border-slate-200 grid grid-cols-5 gap-1.5 text-xs bg-slate-50 p-1.5 rounded">
+            <div className="mt-1 pt-1 border-t border-slate-200 grid grid-cols-5 gap-1.5 text-xs bg-white border border-slate-200 p-1.5 rounded">
               <div>
                 <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Data Operação:</span>
                 <span className="font-black text-slate-900 text-[10.5px]">{activeRecord.date.split('-').reverse().join('/')}</span>
@@ -630,7 +668,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             {/* 7 KPI BOXES (Ordem solicitada: #1 Entrada, #2 Saída, #3 Rend. Desossa, #4 Sub Produtos, #5 Perda/Quebra, #6 Produtividade, #7 Margem) */}
             <div className="grid grid-cols-7 gap-1">
               {/* #1. PESO DE ENTRADA (Kg) */}
-              <div className="p-1 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-white border border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3 leading-3" title={`Peso de Entrada da Matéria-Prima (${unitNounPluralUpper})`}>
                   1. Entrada (Kg)
                 </span>
@@ -643,7 +681,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               </div>
 
               {/* #2. PESO DE SAÍDA (Kg) - Exclusivamente o peso conforme instrução */}
-              <div className="p-1 rounded bg-blue-50/70 border border-blue-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-blue-50/40 print:bg-white border border-blue-200 print:border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-blue-900 uppercase tracking-tight block truncate h-3 leading-3" title="Peso de Saída do Produto Acabado">
                   2. Saída (Kg)
                 </span>
@@ -654,20 +692,20 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               </div>
 
               {/* #3. REND. DESOSSA (%) */}
-              <div className="p-1 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-white border border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3 leading-3" title="Rendimento Líquido da Desossa">
                   3. Rend. Desossa
                 </span>
                 <span className="h-4 flex items-center justify-center text-[12px] font-black text-emerald-700 font-mono tracking-tight leading-none">
-                  {formatPct(activeRecord.deboningYieldNetPct, 2)}
+                  {formatPct(activeRecord.rawMaterialWeightKg > 0 ? (totalSaleableWeight / activeRecord.rawMaterialWeightKg) * 100 : activeRecord.deboningYieldNetPct, 2)}
                 </span>
                 <span className="text-[8px] text-slate-500 font-medium block truncate h-3 leading-3 font-mono">
-                  {formatKg(activeRecord.saleableCutsWeightKg, 0)} carnes
+                  {formatKg(totalSaleableWeight, 0)} carnes
                 </span>
               </div>
 
               {/* #4. SUB PRODUTOS (%) com peso do Osso e Sebo na 2ª linha */}
-              <div className="p-1 rounded bg-amber-50/70 border border-amber-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-amber-50/40 print:bg-white border border-amber-200 print:border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-amber-900 uppercase tracking-tight block truncate h-3 leading-3" title="Sub Produtos: Osso e Sebo">
                   4. Sub Produtos
                 </span>
@@ -682,7 +720,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               </div>
 
               {/* #5. PERDA/QUEBRA */}
-              <div className="p-1 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-white border border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3 leading-3" title="Perda / Quebra de Desossa">
                   5. Perda / Quebra
                 </span>
@@ -695,7 +733,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               </div>
 
               {/* #6. PRODUTIVIDADE (Kg/p) - Sem indicação de meta */}
-              <div className="p-1 rounded bg-slate-50 border border-slate-200 text-center flex flex-col justify-between h-[50px]">
+              <div className="p-1 rounded bg-white border border-slate-300 text-center flex flex-col justify-between h-[50px]">
                 <span className="text-[8.5px] font-bold text-slate-600 uppercase tracking-tight block truncate h-3 leading-3">
                   6. Produtividade
                 </span>
@@ -710,8 +748,8 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               {/* #7. MARGEM DE LUCRO */}
               <div className={`p-1 rounded text-center flex flex-col justify-between h-[50px] ${
                 activeRecordMarginPct >= 0
-                  ? 'bg-emerald-50 border border-emerald-300'
-                  : 'bg-rose-50 border border-rose-300'
+                  ? 'bg-emerald-50/60 print:bg-white border border-emerald-300 print:border-slate-300'
+                  : 'bg-rose-50/60 print:bg-white border border-rose-300 print:border-slate-300'
               }`}>
                 <span className={`text-[8.5px] font-bold uppercase tracking-tight block truncate h-3 leading-3 ${
                   activeRecordMarginPct >= 0 ? 'text-emerald-900' : 'text-rose-900'
@@ -735,7 +773,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
           {/* 3. BALANÇO DE MASSA & EFICIÊNCIA FINANCEIRA (Layout 2 Colunas Otimizado para A4 Retrato) */}
           <div className="grid grid-cols-2 gap-2 mb-1.5">
             {/* Bloco 1: Balanço Físico de Massa */}
-            <div className="border border-slate-200 rounded p-2 bg-slate-50/60">
+            <div className="border border-slate-300 rounded p-2 bg-white">
               <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-900">
                   Balanço Físico de Massa
@@ -774,7 +812,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             </div>
 
             {/* Bloco 2: Composição & Margem Consolidada */}
-            <div className="border border-slate-200 rounded p-2 bg-slate-50/60">
+            <div className="border border-slate-300 rounded p-2 bg-white">
               <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200">
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-900">
                   Composição & Eficiência da Desossa
@@ -788,7 +826,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 <div className="flex justify-between py-0.5 border-b border-slate-200/60 text-emerald-900">
                   <span className="font-semibold">Cortes Vendáveis Líquidos:</span>
                   <span className="font-bold font-mono">
-                    {formatWeightNum(activeRecord.saleableCutsWeightKg, 1)} kg ({formatPct((activeRecord.saleableCutsWeightKg / activeRecord.rawMaterialWeightKg) * 100)})
+                    {formatWeightNum(totalSaleableWeight, 1)} kg ({formatPct((totalSaleableWeight / activeRecord.rawMaterialWeightKg) * 100)})
                   </span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-slate-200/60">
@@ -828,7 +866,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
 
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-300 text-[9px] uppercase tracking-wide">
+                  <tr className="bg-slate-50 print:bg-white text-slate-800 font-bold border-b-2 border-slate-300 text-[9px] uppercase tracking-wide">
                     <th className="py-0.5 px-1.5">Descrição do Corte</th>
                     <th className="py-0.5 px-1.5 text-right">Peso (kg)</th>
                     <th className="py-0.5 px-1.5 text-right">Rend. Apurado (%)</th>
@@ -861,9 +899,9 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   })}
 
                   {/* LINHA COM INFORMAÇÕES DO OSSO (REQUISITO EXPLÍCITO) */}
-                  <tr className="bg-amber-50/50 hover:bg-amber-50/80 border-t border-amber-200 leading-tight">
+                  <tr className="bg-amber-50/50 print:bg-white hover:bg-amber-50/80 border-t border-amber-200 print:border-slate-300 leading-tight">
                     <td className={`${isLargeBatch ? 'py-[1.5px]' : 'py-0.5'} px-1.5 font-bold text-amber-950 flex items-center gap-1 text-[9px]`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0 print:border print:border-amber-700" />
                       <span>Subproduto Osso</span>
                     </td>
                     <td className={`${isLargeBatch ? 'py-[1.5px]' : 'py-0.5'} px-1.5 text-right font-mono font-bold text-slate-900 text-[9px]`}>
@@ -882,9 +920,9 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
 
                   {/* LINHA COM INFORMAÇÕES DO SEBO (REQUISITO EXPLÍCITO) */}
                   {activeRecord.type !== 'SUINO' && (
-                    <tr className="bg-amber-50/30 hover:bg-amber-50/60 border-t border-amber-100 leading-tight">
+                    <tr className="bg-amber-50/30 print:bg-white hover:bg-amber-50/60 border-t border-amber-100 print:border-slate-300 leading-tight">
                       <td className={`${isLargeBatch ? 'py-[1.5px]' : 'py-0.5'} px-1.5 font-bold text-amber-950 flex items-center gap-1 text-[9px]`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 print:border print:border-amber-600" />
                         <span>Subproduto Sebo</span>
                       </td>
                       <td className={`${isLargeBatch ? 'py-[1.5px]' : 'py-0.5'} px-1.5 text-right font-mono font-bold text-slate-900 text-[9px]`}>
@@ -905,7 +943,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
 
                 <tfoot>
                   {/* Subtotal Cortes Vendáveis */}
-                  <tr className="bg-slate-50 font-bold text-slate-800 border-t border-slate-300 text-[9px]">
+                  <tr className="bg-white font-bold text-slate-800 border-t border-slate-300 text-[9px]">
                     <td className="py-0.5 px-1.5 uppercase">Subtotal Cortes Vendáveis</td>
                     <td className="py-0.5 px-1.5 text-right font-mono">{formatWeightNum(totalSaleableWeight, 1)}</td>
                     <td className="py-0.5 px-1.5 text-right font-mono text-emerald-800">
@@ -920,7 +958,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                   </tr>
 
                   {/* TOTAL GERAL CONSIDERANDO CORTES + OSSO + SEBO NAS SOMAS */}
-                  <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-400 text-[9.5px]">
+                  <tr className="bg-slate-50 print:bg-white font-black text-slate-900 border-t-2 border-slate-400 text-[9.5px]">
                     <td className="py-1 px-1.5 uppercase tracking-wide">TOTAL GERAL (PRODUTO ACABADO)</td>
                     <td className="py-1 px-1.5 text-right font-mono text-blue-950 font-black">{formatWeightNum(totalOverallWeight, 1)}</td>
                     <td className="py-1 px-1.5 text-right font-mono text-emerald-900 font-black">

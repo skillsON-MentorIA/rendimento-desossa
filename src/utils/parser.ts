@@ -319,35 +319,28 @@ export function parseSisAtakReport(
         unitPrice = weightKg > 0 ? totalPrice / weightKg : 0;
       }
 
-      // REGRA OFICIAL DE IDENTIFICAÇÃO DE OSSO E SUBPRODUTOS:
-      // Atenção: Produtos com "S/OSSO" ou "S/ OSSO" ou "SEM OSSO" (como PERNIL S/OSSO, PALETA S/OSSO)
-      // NUNCA são subprodutos osso - são carnes vendáveis nobres de alto valor!
+      // REGRA OFICIAL SOLICITADA PELA DIRETORIA:
+      // Considerar como OSSO na soma do subproduto Osso SOMENTE os registros no relatório ATAK que tenham o código/prefixo X-MP.
+      // Produtos vendáveis feitos de osso (ex: "CXGG - OSSO PATINHO BOV CONG", "OSSO BUCO", etc.) NÃO possuem código X-MP
+      // e portanto NÃO são subprodutos, devendo ser considerados cortes vendáveis normais.
+      const hasXMP = /^X-MP/i.test(name) || /X-MP/i.test(code) || /X-MP/i.test(line);
       const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(name);
       const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(name);
 
       let isBone = false;
       let isFat = false;
 
+      // Somente registros com código/prefixo X-MP que contenham OSSO são considerados subproduto osso
+      if (hasXMP && /OSSO/i.test(name) && !isSemOsso && !isMeatCut) {
+        isBone = true;
+      }
+
       if (type === 'SUINO') {
-        // Conforme instrução expressa do cliente:
-        // O ÚNICO subproduto da carne suína é o OSSO!
-        // Considere como OSSO exclusivamente o subproduto com código/descrição X-MP - OSSO SUÍNO (ex: 02010990005, 02010990010)
-        // Carnes vendáveis (como PERNIL S/OSSO, PALETA S/OSSO ou cortes com osso comercializáveis) JAMAIS são subproduto osso!
-        isBone = !isSemOsso && !isMeatCut && (
-          /X-MP.*OSSO/i.test(name) ||
-          /X-MP.*OSSO/i.test(line) ||
-          /OSSO\s+SU[IÍ]NO/i.test(name) ||
-          /OSSO\s+DA\s+DESOSSA/i.test(name) ||
-          code.includes('02010990005') ||
-          code.includes('02010990010') ||
-          (/^X-MP/i.test(name) && /OSSO/i.test(name))
-        );
         // Em suínos, NÃO EXISTE SUBPRODUTO SEBO! Toucinho, banha e papada são produtos acabados vendáveis com preço de PA
         isFat = false;
       } else {
-        // Bovino (DT/TR): osso subproduto descartável (desde que não seja carne S/OSSO)
-        isBone = !isSemOsso && (/OSSO/i.test(name) || code.includes('01010990022'));
-        isFat = /SEBO/i.test(name) || code.includes('01010990023');
+        // Bovino (DT/TR/COSTELA): sebo subproduto
+        isFat = /SEBO/i.test(name) || code.includes('01010990023') || code.includes('01010990008');
       }
 
       const isNonSaleable = isBone || isFat;

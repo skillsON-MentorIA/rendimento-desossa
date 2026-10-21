@@ -5,14 +5,12 @@
     size: A4 portrait;
     margin: 4mm;
   }
-  html, body {
-    background: white !important;
+  html, body, #root, .min-h-screen, main, .print-page-wrapper {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     color: black !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    height: 100% !important;
-    width: 100% !important;
-    overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
   }
@@ -21,13 +19,15 @@
   }
   .one-page-report-sheet {
     box-shadow: none !important;
-    border: none !important;
+    /* Fina linha como moldura elegante do papel solicitada pela diretoria */
+    border: 1px solid #475569 !important;
+    border-radius: 0px !important;
     width: 100% !important;
     max-width: 100% !important;
     height: 100% !important;
-    max-height: 289mm !important;
-    margin: 0 !important;
-    padding: 2mm 3mm !important;
+    max-height: 288mm !important;
+    margin: 0 auto !important;
+    padding: 2.5mm 3.5mm !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     page-break-after: avoid !important;
@@ -35,6 +35,9 @@
     page-break-before: avoid !important;
     break-before: avoid !important;
     overflow: hidden !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
   }
   table, tr, td, th, tbody, thead, tfoot {
     page-break-inside: avoid !important;

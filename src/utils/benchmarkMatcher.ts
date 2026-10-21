@@ -48,12 +48,8 @@ export function findBenchmarkForCut(
   // 3. Subprodutos: Osso e Sebo
   const isSemOsso = /S\/\s*OSSO|SEM\s*OSSO/i.test(cut.name);
   const isMeatCut = /PERNIL|PALETA|LOMBO|COSTEL|BISTECA|CARRE|BARRIGA|PANCETA|COPA|FILE|MIGNON/i.test(cut.name);
-  const isBone = !isSemOsso && !isMeatCut && (
-    cut.category === 'SUBPRODUTO_OSSO' ||
-    (preferredType === 'SUINO'
-      ? (/X-MP.*OSSO/i.test(cut.name) || cut.code?.includes('02010990005') || cut.code?.includes('02010990010'))
-      : /OSSO/i.test(cut.name))
-  );
+  const hasXMP = /^X-MP/i.test(cut.name) || (cut.code && /X-MP/i.test(cut.code));
+  const isBone = !isSemOsso && !isMeatCut && hasXMP && /OSSO/i.test(cut.name);
   const isFat = preferredType !== 'SUINO' && (cut.category === 'SUBPRODUTO_SEBO' || /SEBO/i.test(cut.name));
 
   if (isBone) {

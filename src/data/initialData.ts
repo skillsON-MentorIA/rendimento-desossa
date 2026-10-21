@@ -249,7 +249,7 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
       { id: 'tr18', code: '01020020141-0', name: 'CXGG - LAGARTO BOV CONG (TOP CARNES)', weightKg: 520.500, boxesCount: 20, unitPrice: 31.00, totalPrice: 16135.50, yieldActualPct: 3.23, yieldExpectedPct: 3.20, category: 'TRASEIRO' },
       { id: 'tr19', code: '01020020353-0', name: 'CXGG - MAMINHA BOV CONG (BOSCATTI)', weightKg: 185.545, boxesCount: 8, unitPrice: 38.00, totalPrice: 7050.71, yieldActualPct: 1.15, yieldExpectedPct: 1.20, category: 'NOBRE' },
       { id: 'tr20', code: '01010020240-0', name: 'CXGG - MIOLO ALCATRA BOV RESF (DIMEZA)', weightKg: 554.320, boxesCount: 37, unitPrice: 41.00, totalPrice: 22727.12, yieldActualPct: 3.44, yieldExpectedPct: 3.40, category: 'NOBRE' },
-      { id: 'tr21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 150.335, boxesCount: 7, unitPrice: 5.00, totalPrice: 751.67, yieldActualPct: 0.93, yieldExpectedPct: 0.90, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' },
+      { id: 'tr21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 150.335, boxesCount: 7, unitPrice: 5.00, totalPrice: 751.67, yieldActualPct: 0.93, yieldExpectedPct: 0.90, isNonSaleable: false, category: 'TRASEIRO' },
       { id: 'tr22', code: '01010020246-0', name: 'CXGG - PATINHO BOV RESF (DIMEZA)', weightKg: 731.810, boxesCount: 28, unitPrice: 33.00, totalPrice: 24149.73, yieldActualPct: 4.54, yieldExpectedPct: 4.50, category: 'TRASEIRO' },
       { id: 'tr23', code: '01020020395-0', name: 'CXGG - PICANHA (B) BOV CONG (BOSCATTI)', weightKg: 21.845, boxesCount: 1, unitPrice: 45.00, totalPrice: 983.02, yieldActualPct: 0.14, yieldExpectedPct: 0.15, category: 'NOBRE' },
       { id: 'tr24', code: '01010020292-0', name: 'CXGG - PICANHA BOV RESF (BOSCATTI)', weightKg: 11.250, boxesCount: 1, unitPrice: 88.00, totalPrice: 990.00, yieldActualPct: 0.07, yieldExpectedPct: 0.08, category: 'NOBRE' },
@@ -263,20 +263,20 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
       { id: 'tr32', code: '01010990043-0', name: 'MP - MUSCULO TRASEIRO BOV - RESF', weightKg: 975.000, boxesCount: 6, unitPrice: 29.00, totalPrice: 28275.00, yieldActualPct: 6.05, yieldExpectedPct: 6.00, category: 'TRASEIRO' },
       { id: 'tr33', code: '01010990014-0', name: 'MP - PATINHO BOV RESF', weightKg: 648.000, boxesCount: 9, unitPrice: 33.00, totalPrice: 21384.00, yieldActualPct: 4.02, yieldExpectedPct: 4.00, category: 'TRASEIRO' },
       { id: 'tr34', code: '01010990019-0', name: 'W-MP - RECORTE DO TRASEIRO - BOV - RESF', weightKg: 498.500, boxesCount: 9, unitPrice: 12.00, totalPrice: 5982.00, yieldActualPct: 3.09, yieldExpectedPct: 3.10, category: 'RECORTE' },
-      // Subprodutos não vendáveis (Osso e Sebo)
+      // Subprodutos não vendáveis (Osso e Sebo - exclusivamente registros com código X-MP)
       { id: 'tr35', code: '01010990022-0', name: 'X-MP - OSSO DO TRASEIRO - BOV - RESF', weightKg: 3164.000, boxesCount: 34, unitPrice: 0.77, totalPrice: 2436.28, yieldActualPct: 19.62, yieldExpectedPct: 19.50, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' },
       { id: 'tr36', code: '01010990023-0', name: 'X-MP - SEBO DO TRASEIRO - BOV - RESF', weightKg: 355.000, boxesCount: 5, unitPrice: 1.40, totalPrice: 497.00, yieldActualPct: 2.20, yieldExpectedPct: 2.10, isNonSaleable: true, category: 'SUBPRODUTO_SEBO' },
     ],
     lossKg: 228.705,
     lossPct: 1.4184,
-    saleableCutsWeightKg: 15895.695 - (3164.000 + 355.000 + 150.335), // 12.226,36 kg
-    nonSaleableWeightKg: 3164.000 + 355.000 + 150.335, // 3.669,335 kg
-    boneWeightKg: 3164.000 + 150.335, // 3.314,335 kg
+    saleableCutsWeightKg: 15895.695 - (3164.000 + 355.000), // 12.376,695 kg
+    nonSaleableWeightKg: 3164.000 + 355.000, // 3.519,000 kg
+    boneWeightKg: 3164.000, // 3.164,000 kg (somente o registro com código X-MP)
     fatWeightKg: 355.000,
-    nonSaleablePct: ((3164.000 + 355.000 + 150.335) / 16124.400) * 100, // 22.76%
-    bonePct: ((3164.000 + 150.335) / 16124.400) * 100, // 20.55%
+    nonSaleablePct: ((3164.000 + 355.000) / 16124.400) * 100, // 21.82%
+    bonePct: (3164.000 / 16124.400) * 100, // 19.62%
     fatPct: (355.000 / 16124.400) * 100, // 2.20%
-    deboningYieldNetPct: (12226.360 / 16124.400) * 100, // 75.83% rendimento da desossa (carnes vendáveis / peso total carcaça)
+    deboningYieldNetPct: (12376.695 / 16124.400) * 100, // 76.76% rendimento da desossa (carnes vendáveis / peso total carcaça)
     totalYieldPct: (15895.695 / 16124.400) * 100, // 98.58%
     productivityKgPerPerson: 16124.400 / 22, // 732.93 kg/pessoa
     grossProfitValue: 448200.04 - (16124.400 * 21.80), // R$ 96.688,12
@@ -430,7 +430,7 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
       { id: 'rec_tr_20260826_18', code: '01020020141-0', name: 'CXGG - LAGARTO BOV CONG (TOP CARNES)', weightKg: 531.119, boxesCount: 20, unitPrice: 30.91, totalPrice: 16416.30, yieldActualPct: 3.24, yieldExpectedPct: 3.20, category: 'TRASEIRO' },
       { id: 'rec_tr_20260826_19', code: '01020020353-0', name: 'CXGG - MAMINHA BOV CONG (BOSCATTI)', weightKg: 189.331, boxesCount: 8, unitPrice: 37.89, totalPrice: 7173.41, yieldActualPct: 1.15, yieldExpectedPct: 1.20, category: 'NOBRE' },
       { id: 'rec_tr_20260826_20', code: '01010020240-0', name: 'CXGG - MIOLO ALCATRA BOV RESF (DIMEZA)', weightKg: 565.629, boxesCount: 38, unitPrice: 40.88, totalPrice: 23122.64, yieldActualPct: 3.45, yieldExpectedPct: 3.40, category: 'NOBRE' },
-      { id: 'rec_tr_20260826_21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 153.402, boxesCount: 7, unitPrice: 4.99, totalPrice: 764.75, yieldActualPct: 0.94, yieldExpectedPct: 0.90, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' },
+      { id: 'rec_tr_20260826_21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 153.402, boxesCount: 7, unitPrice: 4.99, totalPrice: 764.75, yieldActualPct: 0.94, yieldExpectedPct: 0.90, isNonSaleable: false, category: 'TRASEIRO' },
       { id: 'rec_tr_20260826_22', code: '01010020246-0', name: 'CXGG - PATINHO BOV RESF (DIMEZA)', weightKg: 746.740, boxesCount: 29, unitPrice: 32.90, totalPrice: 24570.00, yieldActualPct: 4.55, yieldExpectedPct: 4.50, category: 'TRASEIRO' },
       { id: 'rec_tr_20260826_23', code: '01020020395-0', name: 'CXGG - PICANHA (B) BOV CONG (BOSCATTI)', weightKg: 22.291, boxesCount: 1, unitPrice: 44.87, totalPrice: 1000.13, yieldActualPct: 0.14, yieldExpectedPct: 0.15, category: 'NOBRE' },
       { id: 'rec_tr_20260826_24', code: '01010020292-0', name: 'CXGG - PICANHA BOV RESF (BOSCATTI)', weightKg: 11.480, boxesCount: 1, unitPrice: 87.74, totalPrice: 1007.23, yieldActualPct: 0.07, yieldExpectedPct: 0.08, category: 'NOBRE' },
@@ -559,7 +559,7 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
       { id: 'rec_tr_20260829_18', code: '01020020141-0', name: 'CXGG - LAGARTO BOV CONG (TOP CARNES)', weightKg: 517.039, boxesCount: 20, unitPrice: 30.82, totalPrice: 15933.89, yieldActualPct: 3.24, yieldExpectedPct: 3.20, category: 'TRASEIRO' },
       { id: 'rec_tr_20260829_19', code: '01020020353-0', name: 'CXGG - MAMINHA BOV CONG (BOSCATTI)', weightKg: 184.311, boxesCount: 8, unitPrice: 37.78, totalPrice: 6962.61, yieldActualPct: 1.15, yieldExpectedPct: 1.20, category: 'NOBRE' },
       { id: 'rec_tr_20260829_20', code: '01010020240-0', name: 'CXGG - MIOLO ALCATRA BOV RESF (DIMEZA)', weightKg: 550.634, boxesCount: 37, unitPrice: 40.76, totalPrice: 22443.16, yieldActualPct: 3.45, yieldExpectedPct: 3.40, category: 'NOBRE' },
-      { id: 'rec_tr_20260829_21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 149.335, boxesCount: 7, unitPrice: 4.97, totalPrice: 742.28, yieldActualPct: 0.93, yieldExpectedPct: 0.90, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' },
+      { id: 'rec_tr_20260829_21', code: '01020010043-0', name: 'CXGG - OSSO PATINHO BOV CONG (TOP CARNES)', weightKg: 149.335, boxesCount: 7, unitPrice: 4.97, totalPrice: 742.28, yieldActualPct: 0.93, yieldExpectedPct: 0.90, isNonSaleable: false, category: 'TRASEIRO' },
       { id: 'rec_tr_20260829_22', code: '01010020246-0', name: 'CXGG - PATINHO BOV RESF (DIMEZA)', weightKg: 726.944, boxesCount: 28, unitPrice: 32.81, totalPrice: 23847.99, yieldActualPct: 4.55, yieldExpectedPct: 4.50, category: 'TRASEIRO' },
       { id: 'rec_tr_20260829_23', code: '01020020395-0', name: 'CXGG - PICANHA (B) BOV CONG (BOSCATTI)', weightKg: 21.700, boxesCount: 1, unitPrice: 44.73, totalPrice: 970.74, yieldActualPct: 0.14, yieldExpectedPct: 0.15, category: 'NOBRE' },
       { id: 'rec_tr_20260829_24', code: '01010020292-0', name: 'CXGG - PICANHA BOV RESF (BOSCATTI)', weightKg: 11.175, boxesCount: 1, unitPrice: 87.48, totalPrice: 977.63, yieldActualPct: 0.07, yieldExpectedPct: 0.08, category: 'NOBRE' },

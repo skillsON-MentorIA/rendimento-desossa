@@ -89,7 +89,8 @@ function cleanText(txt: string): string {
  */
 export function matchGroupDianteiro(cut: { name: string; code?: string }): string {
   const n = cleanText(cut.name);
-  if (/OSSO/i.test(n)) return 'Osso';
+  const hasXMP = /^X-MP/i.test(cut.name) || (cut.code && /X-MP/i.test(cut.code));
+  if (hasXMP && /OSSO/i.test(n)) return 'Osso';
   if (/SEBO/i.test(n)) return 'Sebo';
   if (/ACEM/i.test(n)) return 'Acém';
   if (/MACA|PEITO/i.test(n)) return 'Maçã';
@@ -105,8 +106,9 @@ export function matchGroupDianteiro(cut: { name: string; code?: string }): strin
 export function matchGroupTraseiro(cut: { name: string; code?: string }): string {
   const n = cleanText(cut.name);
   const code = (cut.code || '').replace(/\D/g, '');
+  const hasXMP = /^X-MP/i.test(cut.name) || (cut.code && /X-MP/i.test(cut.code));
 
-  if (/OSSO/i.test(n) || code.includes('01010990022')) return 'Osso';
+  if (hasXMP && /OSSO/i.test(n)) return 'Osso';
   if (/SEBO/i.test(n) || code.includes('01010990023')) return 'Sebo';
   if (/PICANHA/i.test(n) || code.includes('01010990045')) return 'Picanha';
   if (/FILE\s*MIGNON|MIGNON/i.test(n) || code.includes('01010990044')) return 'Filé Mignon';
@@ -166,7 +168,8 @@ export function matchGroupSuino(cut: { name: string; code?: string }): string {
  */
 export function matchGroupCostela(cut: { name: string; code?: string }): string {
   const n = cleanText(cut.name);
-  if (/OSSO/i.test(n)) return 'Osso';
+  const hasXMP = /^X-MP/i.test(cut.name) || (cut.code && /X-MP/i.test(cut.code));
+  if (hasXMP && /OSSO/i.test(n)) return 'Osso';
   if (/SEBO/i.test(n)) return 'Sebo';
   if (/MINGA|JANELA|TIRA/i.test(n)) return 'Costela Minga / Janela';
   if (/RIPA/i.test(n)) return 'Costela Ripa';

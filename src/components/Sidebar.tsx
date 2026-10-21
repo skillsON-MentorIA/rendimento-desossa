@@ -4,6 +4,7 @@ import {
   Beef,
   UploadCloud,
   FileSpreadsheet,
+  Layers,
   Settings,
   Building2,
   PanelLeftClose,
@@ -86,7 +87,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'One Page Report (OPR)',
       icon: FileSpreadsheet,
       badge: 'Diretoria',
-      desc: 'Relatório Executivo A4 e Envio',
+      desc: 'Relatório Executivo Geral A4',
+    },
+    {
+      id: 'report_cortes',
+      label: 'OPR Cortes (Tipos de Cortes)',
+      icon: Layers,
+      badge: 'Novo',
+      desc: 'Consolidado por Tipo vs Padrão',
     },
     ...(isAdmin
       ? [
