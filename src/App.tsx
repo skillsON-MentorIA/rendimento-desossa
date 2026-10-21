@@ -10,6 +10,7 @@ import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
 import { DianteiroView } from './components/DianteiroView';
 import { TraseiroView } from './components/TraseiroView';
+import { CostelaView } from './components/CostelaView';
 import { SuinoView } from './components/SuinoView';
 import { UploadView } from './components/UploadView';
 import { OnePageReport } from './components/OnePageReport';
@@ -89,6 +90,7 @@ const MainLayout: React.FC = () => {
               onNavigateToOnePage={() => setCurrentTab('report')}
               onNavigateToDianteiro={() => setCurrentTab('dianteiro')}
               onNavigateToTraseiro={() => setCurrentTab('traseiro')}
+              onNavigateToCostela={() => setCurrentTab('costela')}
               onNavigateToSuino={() => setCurrentTab('suino')}
             />
           )}
@@ -96,6 +98,8 @@ const MainLayout: React.FC = () => {
           {currentTab === 'dianteiro' && <DianteiroView />}
 
           {currentTab === 'traseiro' && <TraseiroView />}
+
+          {currentTab === 'costela' && <CostelaView />}
 
           {currentTab === 'suino' && <SuinoView />}
 

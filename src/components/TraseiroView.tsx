@@ -231,7 +231,7 @@ export const TraseiroView: React.FC = () => {
         {/* 1. Rendimento Desossa TR */}
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full min-h-[156px]">
           <div className="flex items-center justify-between text-slate-500 mb-2 h-7">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Rendimento Líquido da Desossa: Carnes Vendáveis sobre Carcaça">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Rendimento Líquido da Desossa: Carnes Vendáveis sobre Peça">
               Rend. Desossa TR
             </span>
             <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
@@ -519,7 +519,7 @@ export const TraseiroView: React.FC = () => {
               <tr className="bg-rose-50/80 text-rose-950 font-bold border-t border-rose-200">
                 <td className="py-2.5 px-3 flex items-center gap-1.5 text-rose-950">
                   <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
-                  <span>(-) Custo da Carcaça Comprada (Matéria-Prima com Osso)</span>
+                  <span>(-) Custo da Peça Comprada (Matéria-Prima com Osso)</span>
                 </td>
                 <td className="py-2.5 px-3 text-center">
                   <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-1.5 py-0.5 rounded uppercase">
@@ -607,10 +607,10 @@ export const TraseiroView: React.FC = () => {
               </span>
             </div>
 
-            {/* Box 2: Custo da Carcaça Comprada */}
+            {/* Box 2: Custo da Peça Comprada */}
             <div className="bg-white p-3 rounded-lg border border-rose-200 shadow-2xs">
               <span className="text-[10px] font-bold text-rose-900 uppercase block mb-1">
-                2. (-) Carcaça Comprada
+                2. (-) Peça Comprada
               </span>
               <div className="text-base font-black text-rose-900 font-mono">
                 {formatCurrency(totalCost)}
@@ -637,7 +637,7 @@ export const TraseiroView: React.FC = () => {
               <span className={`text-[10px] block mt-0.5 ${
                 operationGrossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'
               }`}>
-                {operationGrossProfit >= 0 ? 'Ganho absoluto após desossar a carcaça' : 'Resultado deficitário da carcaça'}
+                {operationGrossProfit >= 0 ? 'Ganho absoluto após desossar as peças' : 'Resultado deficitário da peça'}
               </span>
             </div>
 
@@ -667,7 +667,7 @@ export const TraseiroView: React.FC = () => {
               <div className={`text-[10px] mt-1 flex items-center justify-between border-t pt-1 ${
                 operationMarginOnRevenuePct >= 0 ? 'text-emerald-800 border-emerald-200' : 'text-rose-800 border-rose-200'
               }`}>
-                <span>Markup s/ Carcaça:</span>
+                <span>Markup s/ Peça:</span>
                 <strong className="font-mono">+{formatPct(operationMarginOnCostPct, 2)}</strong>
               </div>
             </div>

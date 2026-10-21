@@ -11,7 +11,7 @@ export interface User {
   shift?: string;
 }
 
-export type CutType = 'DIANTEIRO' | 'TRASEIRO' | 'SUINO';
+export type CutType = 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA';
 
 export interface CutItem {
   id: string;
@@ -24,7 +24,7 @@ export interface CutItem {
   yieldActualPct: number; // Rendimento Apurado %
   yieldExpectedPct: number; // Rendimento Padrão Mercado %
   isNonSaleable?: boolean; // Sebo ou Osso
-  category: 'NOBRE' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'SUBPRODUTO_OSSO' | 'SUBPRODUTO_SEBO' | 'RECORTE';
+  category: 'NOBRE' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA' | 'SUBPRODUTO_OSSO' | 'SUBPRODUTO_SEBO' | 'RECORTE';
 }
 
 export interface OperatorStat {
@@ -116,7 +116,7 @@ export interface FilterState {
   startDate?: string; // YYYY-MM-DD
   endDate?: string; // YYYY-MM-DD
   month: string; // YYYY-MM
-  type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO';
+  type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA';
   shift: 'ALL' | 'Turno 1' | 'Turno 2' | 'Turno 3';
   operator: 'ALL' | string;
 }

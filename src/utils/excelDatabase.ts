@@ -292,6 +292,8 @@ export async function importMasterDatabaseFromExcel(file: File): Promise<ExcelIm
           const rawTypeStr = String(row['Tipo'] || '').toUpperCase();
           const type: CutType = (rawTypeStr.includes('SU') || rawTypeStr.includes('DS'))
             ? 'SUINO'
+            : (rawTypeStr.includes('COST') || rawTypeStr.includes('CT'))
+            ? 'COSTELA'
             : (rawTypeStr.includes('TR') ? 'TRASEIRO' : 'DIANTEIRO');
           const responsibleOperator = String(row['Líder de Desossa'] || row['Lider'] || 'Encarregado');
           const operatorCount = Number(row['Operadores (Pessoas)'] || row['Operadores'] || 20);

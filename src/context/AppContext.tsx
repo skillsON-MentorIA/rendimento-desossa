@@ -6,7 +6,7 @@ import {
   INITIAL_USERS
 } from '../data/initialData';
 import { CutItem, CutType, FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
-import { CalculatedSummary, calculateSummary } from '../utils/calculations';
+import { CalculatedSummary, calculateSummary, cleanRawMaterialName } from '../utils/calculations';
 import {
   syncRecordsToSupabase,
   fetchRecordsFromSupabase,
@@ -51,8 +51,8 @@ interface AppContextType {
   lastExportDate: string | null;
   setLastExportDate: (date: string | null) => void;
   updateBenchmark: (code: string, newExpectedPct: number) => void;
-  carcassCosts: { DIANTEIRO: number; TRASEIRO: number; SUINO: number };
-  updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => void;
+  carcassCosts: { DIANTEIRO: number; TRASEIRO: number; SUINO: number; COSTELA: number };
+  updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA', newCost: number) => void;
   resetToDemoData: () => void;
   login: (username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
@@ -79,12 +79,14 @@ export interface CarcassCostsState {
   DIANTEIRO: number;
   TRASEIRO: number;
   SUINO: number;
+  COSTELA: number;
 }
 
 const DEFAULT_CARCASS_COSTS: CarcassCostsState = {
   DIANTEIRO: 15.20,
   TRASEIRO: 21.80,
   SUINO: 9.30,
+  COSTELA: 14.50,
 };
 
 /**
@@ -99,7 +101,12 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
     r.rawMaterialCode?.startsWith('2110') ||
     (r.cuts && r.cuts.some((c) => /PERNIL|PALETA\s+SU|SU[IÍ]NO/i.test(c.name)));
 
-  if (!isActuallySuino || !r.cuts || r.cuts.length === 0) return r;
+  if (!isActuallySuino || !r.cuts || r.cuts.length === 0) {
+    return {
+      ...r,
+      rawMaterialDesc: cleanRawMaterialName(r.rawMaterialDesc) || r.rawMaterialDesc,
+    };
+  }
 
   const type: CutType = 'SUINO';
 
@@ -149,7 +156,7 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
   const grossProfitValue = r.finishedProductTotalValue - totalCarcassCost;
   const profitMarginPct = r.finishedProductTotalValue > 0 ? (grossProfitValue / r.finishedProductTotalValue) * 100 : 0;
 
-  let rawMaterialDesc = r.rawMaterialDesc;
+  let rawMaterialDesc = cleanRawMaterialName(r.rawMaterialDesc);
   if (!rawMaterialDesc || rawMaterialDesc === 'CARCAÇA SUÍNA C/ OSSO' || /MATRIZ/i.test(rawMaterialDesc) || r.rawMaterialCode?.includes('1110003') || r.rawMaterialWeightKg === 21284) {
     rawMaterialDesc = '1/2 CARCAÇA SUÍNA MATRIZ';
   }
@@ -613,7 +620,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO', newCost: number) => {
+  const updateCarcassCost = (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA', newCost: number) => {
     setCarcassCosts((prev) => {
       const next = { ...prev, [type]: newCost };
       localStorage.setItem(STORAGE_KEY_CARCASS_COSTS, JSON.stringify(next));

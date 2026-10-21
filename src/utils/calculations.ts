@@ -175,3 +175,75 @@ export function formatCurrency(val: number): string {
     currency: 'BRL',
   });
 }
+
+/**
+ * Retorna a nomenclatura correta da unidade de matéria-prima:
+ * - Carne Bovina (DT, TR, COSTELA): "PEÇA" / "PEÇAS"
+ * - Carne Suína (SUINO): "CARCAÇA" / "CARCAÇAS"
+ */
+export function getUnitNoun(
+  type?: string,
+  count: number = 1,
+  uppercase: boolean = false
+): string {
+  const isSuino = type === 'SUINO' || (typeof type === 'string' && /SU[IÍ]NO/i.test(type));
+  if (isSuino) {
+    if (uppercase) return count === 1 ? 'CARCAÇA' : 'CARCAÇAS';
+    return count === 1 ? 'Carcaça' : 'Carcaças';
+  }
+  // Bovina: DT, TR, COSTELA
+  if (uppercase) return count === 1 ? 'PEÇA' : 'PEÇAS';
+  return count === 1 ? 'Peça' : 'Peças';
+}
+
+/**
+ * Retorna o título singular da matéria-prima:
+ * - Bovina: "Peça" / "PEÇA"
+ * - Suína: "Carcaça" / "CARCAÇA"
+ */
+export function getRawMaterialUnitTitle(
+  type?: string,
+  uppercase: boolean = false
+): string {
+  const isSuino = type === 'SUINO' || (typeof type === 'string' && /SU[IÍ]NO/i.test(type));
+  if (isSuino) {
+    return uppercase ? 'CARCAÇA' : 'Carcaça';
+  }
+  return uppercase ? 'PEÇA' : 'Peça';
+}
+
+/**
+ * Higieniza o nome descritivo da matéria-prima vindo do relatório SisAtak RETQ010.
+ * Remove códigos de produto iniciais (ex: "1110002-0 "), dígitos soltos remanescentes (ex: "0 "),
+ * e trunca todas as colunas numéricas de dados (pesos, caixas, médias, valores unitários e R$)
+ * que aparecem após o nome da matéria-prima no cabeçalho do SisAtak.
+ * Preserva nomes legítimos que iniciam com fração como "1/2 CARCAÇA SUÍNA MATRIZ".
+ */
+export function cleanRawMaterialName(rawDesc?: string): string {
+  if (!rawDesc) return '';
+  let cleaned = rawDesc.trim();
+
+  // 1. Remover cabeçalhos de tabela capturados por equívoco
+  cleaned = cleaned.replace(/^PRODUTO\s*\/Ref\s+Descri[çc][ãa]o\s+Produto.*/i, '');
+  cleaned = cleaned.replace(/^PRODUTO\s*:\s*/i, '');
+  cleaned = cleaned.replace(/^MP\s*-\s*/i, '');
+
+  // 2. Remover código de produto do SisAtak no início (ex: "1110002-0 ", "1110001-0 - ")
+  // Garante que não apague "1/2" porque exige pelo menos 4 dígitos
+  cleaned = cleaned.replace(/^\d{4,12}(?:-\w+)?\s*(?:-\s*)?/, '');
+
+  // 3. Remover dígito numérico isolado remanescente no início (ex: "0 DIANTEIRO BOVINO..." do print do usuário)
+  cleaned = cleaned.replace(/^\d\s+(?=[A-Za-zÀ-ÿ])/i, '');
+
+  // 4. Truncar a partir da primeira coluna numérica do SisAtak (peso kg, caixas cx, médias, valores em R$)
+  // Exemplo: "DIANTEIRO BOVINO C/ OSSO 11.801,600KG 263,000CX 44,873KG 20,00 236.032,00 R$"
+  cleaned = cleaned.replace(/\s+\d{1,3}(?:\.\d{3})*,\d{2,3}\s*(?:KG|CX|UN|R\$)?.*$/i, '');
+  cleaned = cleaned.replace(/\s+\d+,\d{2,3}\s*(?:KG|CX|UN|R\$)?.*$/i, '');
+
+  // 5. Remover qualquer sufixo residual de unidade ou moeda
+  cleaned = cleaned.replace(/\s+(?:KG|CX|UN|R\$)$/i, '');
+
+  return cleaned.trim().toUpperCase();
+}
+
+

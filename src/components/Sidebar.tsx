@@ -60,6 +60,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       desc: 'Picanha, Contra-filé, Alcatra',
     },
     {
+      id: 'costela',
+      label: 'Desossa Costela (CT)',
+      icon: Beef,
+      badge: 'CT',
+      desc: 'Minga, Ripa, Matambre, Ponta',
+    },
+    {
       id: 'suino',
       label: 'Desossa Suíno (DS)',
       icon: Beef,

@@ -140,9 +140,16 @@ export const INITIAL_MARKET_BENCHMARKS: MarketBenchmark[] = [
   { code: '02010010060-0', name: 'Bisteca / Carré Suíno', type: 'SUINO', expectedYieldPct: 7.50, standardPricePerKg: 19.50, tolerancePct: 0.5 },
   { code: '02010010070-0', name: 'Copa Lombo / Sobrepaleta', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 22.50, tolerancePct: 0.4 },
   { code: '02010010080-0', name: 'Filé Mignon Suíno', type: 'SUINO', expectedYieldPct: 1.80, standardPricePerKg: 25.00, tolerancePct: 0.2 },
-  { code: '02010010090-0', name: 'Recorte Suíno Industrial', type: 'SUINO', expectedYieldPct: 4.00, standardPricePerKg: 11.50, tolerancePct: 0.6 },
   { code: '02010990020-0', name: 'Toucinho / Banha Resf', type: 'SUINO', expectedYieldPct: 4.50, standardPricePerKg: 5.50, tolerancePct: 0.5 },
-  { code: '02010990010-0', name: 'Osso Suíno (Subproduto)', type: 'SUINO', expectedYieldPct: 3.50, standardPricePerKg: 0.80, tolerancePct: 0.5 }
+  { code: '02010990010-0', name: 'Osso Suíno (Subproduto)', type: 'SUINO', expectedYieldPct: 3.50, standardPricePerKg: 0.80, tolerancePct: 0.5 },
+
+  // Costela Bovina (CT)
+  { code: '01010040010-0', name: 'Costela Bovina Minga / Janela', type: 'COSTELA', expectedYieldPct: 34.50, standardPricePerKg: 26.00, tolerancePct: 1.0 },
+  { code: '01010040020-0', name: 'Costela Bovina Ripa', type: 'COSTELA', expectedYieldPct: 20.50, standardPricePerKg: 24.50, tolerancePct: 0.8 },
+  { code: '01010040030-0', name: 'Matambre / Fraldinha da Costela', type: 'COSTELA', expectedYieldPct: 8.80, standardPricePerKg: 28.00, tolerancePct: 0.5 },
+  { code: '01010040040-0', name: 'Recorte Bovino da Costela', type: 'COSTELA', expectedYieldPct: 4.20, standardPricePerKg: 13.00, tolerancePct: 0.5 },
+  { code: '01010990040-0', name: 'Osso da Costela Bovina (Subproduto)', type: 'COSTELA', expectedYieldPct: 28.80, standardPricePerKg: 0.77, tolerancePct: 1.5 },
+  { code: '01010990041-0', name: 'Sebo da Costela Bovina (Subproduto)', type: 'COSTELA', expectedYieldPct: 2.20, standardPricePerKg: 1.40, tolerancePct: 0.4 }
 ];
 
 // Dados históricos e autênticos extraídos dos relatórios SisAtak anexados
@@ -636,6 +643,53 @@ export const INITIAL_PRODUCTION_RECORDS: ProductionRecord[] = [
     grossProfitValue: 248596.12 - (12850.000 * 9.30),
     profitMarginPct: ((248596.12 - (12850.000 * 9.30)) / 248596.12) * 100,
     notes: 'Primeiro lote oficial de Desossa Suína (DS) registrado no sistema.'
+  },
+
+  // 4. COSTELA BOVINA (CT) - 29/08/2026 (Linha exclusiva de Costela)
+  {
+    id: 'rec_ct_20260829',
+    date: '2026-08-29',
+    periodStart: '2026-08-29',
+    periodEnd: '2026-08-29',
+    companyName: 'BH FOODS COMERCIO E INDUSTRIA LTDA',
+    emissionTime: '29/08/2026 10:15 h',
+    type: 'COSTELA',
+    shift: 'Turno 1',
+    responsibleOperator: 'Carlos Antunes',
+    operatorCount: 16,
+    rawMaterialCode: '1110004-0',
+    rawMaterialDesc: 'COSTELA BOVINA C/ OSSO',
+    rawMaterialWeightKg: 7850.000,
+    rawMaterialBoxes: 240,
+    rawMaterialAvgWeightKg: 32.708,
+    carcassCostPerKg: 14.50, // Custo da Peça Bovina (Costela)
+    totalCarcassCost: 7850.000 * 14.50, // R$ 113.825,00
+    finishedProductWeightKg: 7770.000,
+    finishedProductBoxes: 210,
+    finishedProductTotalValue: 135450.13,
+    cuts: [
+      { id: 'rec_ct_20260829_1', code: '01010040010-0', name: 'CXGG - COSTELA BOV MINGA RESF', weightKg: 2708.250, boxesCount: 90, unitPrice: 26.00, totalPrice: 70414.50, yieldActualPct: 34.50, yieldExpectedPct: 34.50, category: 'COSTELA' },
+      { id: 'rec_ct_20260829_2', code: '01010040020-0', name: 'CXGG - COSTELA BOV RIPA RESF', weightKg: 1609.250, boxesCount: 55, unitPrice: 24.50, totalPrice: 39426.63, yieldActualPct: 20.50, yieldExpectedPct: 20.50, category: 'COSTELA' },
+      { id: 'rec_ct_20260829_3', code: '01010040030-0', name: 'CXGG - MATAMBRE / FRALDINHA COSTELA RESF', weightKg: 690.800, boxesCount: 24, unitPrice: 28.00, totalPrice: 19342.40, yieldActualPct: 8.80, yieldExpectedPct: 8.80, category: 'COSTELA' },
+      { id: 'rec_ct_20260829_4', code: '01010040040-0', name: 'W-MP - RECORTE BOVINO COSTELA RESF', weightKg: 329.700, boxesCount: 12, unitPrice: 13.00, totalPrice: 4286.10, yieldActualPct: 4.20, yieldExpectedPct: 4.20, category: 'RECORTE' },
+      { id: 'rec_ct_20260829_5', code: '01010990040-0', name: 'X-MP - OSSO DA COSTELA BOVINA RESF', weightKg: 2260.800, boxesCount: 25, unitPrice: 0.77, totalPrice: 1740.82, yieldActualPct: 28.80, yieldExpectedPct: 28.80, isNonSaleable: true, category: 'SUBPRODUTO_OSSO' },
+      { id: 'rec_ct_20260829_6', code: '01010990041-0', name: 'X-MP - SEBO DA COSTELA BOVINA RESF', weightKg: 171.200, boxesCount: 4, unitPrice: 1.40, totalPrice: 239.68, yieldActualPct: 2.18, yieldExpectedPct: 2.20, isNonSaleable: true, category: 'SUBPRODUTO_SEBO' }
+    ],
+    lossKg: 80.000,
+    lossPct: 1.019,
+    saleableCutsWeightKg: 5338.000,
+    nonSaleableWeightKg: 2432.000,
+    boneWeightKg: 2260.800,
+    fatWeightKg: 171.200,
+    nonSaleablePct: (2432.000 / 7850.000) * 100,
+    bonePct: (2260.800 / 7850.000) * 100,
+    fatPct: (171.200 / 7850.000) * 100,
+    deboningYieldNetPct: (5338.000 / 7850.000) * 100, // 68.00%
+    totalYieldPct: 98.98,
+    productivityKgPerPerson: 490.63,
+    grossProfitValue: 135450.13 - (7850.000 * 14.50),
+    profitMarginPct: ((135450.13 - (7850.000 * 14.50)) / 135450.13) * 100,
+    notes: 'Lote oficial de Desossa de Costela Bovina (CT) emitido via SisAtak.'
   }
 ];
 
@@ -754,5 +808,31 @@ RESUMO
 Grupo Rendimento Matéria-Prima (kg) Produto Acabado (kg) Rendimento Valor MP (R$) Valor PA (R$) Quebra (R$) M
 DS - SUÍNO 12.850,000 12.659,550 98,52 % 0,00 248.596,12 248.596,12 R$
 TOTALIZAÇÃO: 12.850,000 12.659,550 98,52 % 0,00 248.596,12 248.596,12
-QUEBRA: 190,450 1,4820 %
-Filtros Utilizados: Empresa: 021 Período: 27/08/2026 a 27/08/2026`;
+FILTROS UTILIZADOS: Empresa: 021 Período: 27/08/2026 a 27/08/2026`;
+
+export const RAW_SAMPLE_SISATAK_COSTELA = `SisAtak - Sistema de Administracao Integrada de Negocios
+RETQ010 - Relatório de Produção - Desossa por Data Emissão: 29/08/2026 10:15 h Página : 0001/ 0001
+BH FOODS COMERCIO E INDUSTRIA LTDA
+MATÉRIA-PRIMA
+Produto/Ref Descrição Produto Qtde UN Qtde UN Media Vlr Un Total Produto M
+GRUPO DE RENDIMENTO : CT - COSTELA
+1110004-0 COSTELA BOVINA C/ OSSO 7.850,000KG 240,000CX 32,708KG 0,00 0,00 R$
+Total Grupo: CT 7.850,000 240,000 0,000
+Total Matéria Prima : 7.850,000 240,000
+PRODUTO ACABADO
+Produto/Ref Descrição Produto Qtde UN Qtde UN Interna Rend. Apurado Rend. Esperado Valor Unit. Total Produto M
+GRUPO RENDIMENTO : CT - COSTELA
+01010040010-0 CXGG - COSTELA BOV MINGA RESF 2.708,250 KG 90,000 CX 090 34,50 % 0,00 % 26,00 70.414,50 R$
+01010040020-0 CXGG - COSTELA BOV RIPA RESF 1.609,250 KG 55,000 CX 055 20,50 % 0,00 % 24,50 39.426,63 R$
+01010040030-0 CXGG - MATAMBRE / FRALDINHA COSTELA RESF 690,800 KG 24,000 CX 024 8,80 % 0,00 % 28,00 19.342,40 R$
+01010040040-0 W-MP - RECORTE BOVINO COSTELA RESF 329,700 KG 12,000 CX 012 4,20 % 0,00 % 13,00 4.286,10 R$
+01010990040-0 X-MP - OSSO DA COSTELA BOVINA RESF 2.260,800 KG 25,000 CX 025 28,80 % 0,00 % 0,77 1.740,82 R$
+01010990041-0 X-MP - SEBO DA COSTELA BOVINA RESF 171,200 KG 4,000 CX 004 2,18 % 0,00 % 1,40 239,68 R$
+Total: CT 7.770,000 210,000 98,98 % 17,43 135.450,13
+RESUMO
+Grupo Rendimento Matéria-Prima (kg) Produto Acabado (kg) Rendimento Valor MP (R$) Valor PA (R$) Quebra (R$) M
+CT - COSTELA 7.850,000 7.770,000 98,98 % 0,00 135.450,13 135.450,13 R$
+TOTALIZAÇÃO: 7.850,000 7.770,000 98,98 % 0,00 135.450,13 135.450,13
+QUEBRA: 80,000 1,0191 %
+Filtros Utilizados: Empresa: 021 Período: 29/08/2026 a 29/08/2026`;
+

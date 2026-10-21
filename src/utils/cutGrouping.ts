@@ -63,6 +63,15 @@ export const STANDARDS_SUINO: { name: string; standardPct: number; codeRef?: str
   { name: 'Osso', standardPct: 3.50, codeRef: 'OSSO_SUINO' },
 ];
 
+export const STANDARDS_COSTELA: { name: string; standardPct: number; codeRef?: string }[] = [
+  { name: 'Costela Minga / Janela', standardPct: 35.00, codeRef: 'COSTELA_MINGA' },
+  { name: 'Costela Ripa', standardPct: 20.00, codeRef: 'COSTELA_RIPA' },
+  { name: 'Fraldinha / Matambre', standardPct: 8.50, codeRef: 'MATAMBRE_FRALDINHA' },
+  { name: 'Recorte', standardPct: 4.50, codeRef: 'RECORTE_COSTELA' },
+  { name: 'Osso', standardPct: 29.00, codeRef: 'OSSO_COSTELA' },
+  { name: 'Sebo', standardPct: 3.00, codeRef: 'SEBO_COSTELA' },
+];
+
 /**
  * Normaliza o texto para casamento de padrões
  */
@@ -153,6 +162,20 @@ export function matchGroupSuino(cut: { name: string; code?: string }): string {
 }
 
 /**
+ * Identifica o grupo padrão da Costela para um corte
+ */
+export function matchGroupCostela(cut: { name: string; code?: string }): string {
+  const n = cleanText(cut.name);
+  if (/OSSO/i.test(n)) return 'Osso';
+  if (/SEBO/i.test(n)) return 'Sebo';
+  if (/MINGA|JANELA|TIRA/i.test(n)) return 'Costela Minga / Janela';
+  if (/RIPA/i.test(n)) return 'Costela Ripa';
+  if (/FRALDINHA|MATAMBRE/i.test(n)) return 'Fraldinha / Matambre';
+  if (/COSTELA/i.test(n)) return 'Costela Minga / Janela';
+  return 'Recorte';
+}
+
+/**
  * Agrupa cortes por tipo e calcula o rendimento apurado vs padrão
  */
 export function calculateGroupedYields(
@@ -166,11 +189,15 @@ export function calculateGroupedYields(
     ? STANDARDS_DIANTEIRO
     : targetType === 'SUINO'
     ? STANDARDS_SUINO
+    : targetType === 'COSTELA'
+    ? STANDARDS_COSTELA
     : STANDARDS_TRASEIRO;
   const matchFn = targetType === 'DIANTEIRO'
     ? matchGroupDianteiro
     : targetType === 'SUINO'
     ? matchGroupSuino
+    : targetType === 'COSTELA'
+    ? matchGroupCostela
     : matchGroupTraseiro;
 
   // Inicializar acumuladores para cada grupo oficial
