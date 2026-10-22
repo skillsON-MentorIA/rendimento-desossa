@@ -32,6 +32,18 @@ const MainLayout: React.FC = () => {
     return localStorage.getItem('frigo_sidebar_collapsed') === 'true';
   });
 
+  // Proteção de rotas: se o usuário logado não for ADMIN e estiver na aba de admin/settings,
+  // ou se for DIRETORIA e estiver na aba de upload, redirecionar automaticamente para o Dashboard Geral.
+  React.useEffect(() => {
+    if (!currentUser) return;
+
+    if ((currentTab === 'admin' || currentTab === 'settings') && currentUser.role !== 'ADMIN') {
+      setCurrentTab('dashboard');
+    } else if (currentTab === 'upload' && currentUser.role === 'DIRETORIA') {
+      setCurrentTab('dashboard');
+    }
+  }, [currentUser, currentTab]);
+
   const handleToggleCollapse = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
@@ -106,7 +118,10 @@ const MainLayout: React.FC = () => {
           {currentTab === 'suino' && <SuinoView />}
 
           {currentTab === 'upload' && (
-            <UploadView onSuccessUpload={handleSuccessUpload} />
+            <UploadView
+              onSuccessUpload={handleSuccessUpload}
+              onNavigateToDashboard={() => setCurrentTab('dashboard')}
+            />
           )}
 
           {currentTab === 'report' && (
@@ -123,7 +138,9 @@ const MainLayout: React.FC = () => {
             />
           )}
 
-          {(currentTab === 'admin' || currentTab === 'settings') && <AdminView />}
+          {(currentTab === 'admin' || currentTab === 'settings') && (
+            <AdminView onNavigateToDashboard={() => setCurrentTab('dashboard')} />
+          )}
         </main>
       </div>
 

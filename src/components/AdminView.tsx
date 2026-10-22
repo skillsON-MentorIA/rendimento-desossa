@@ -43,7 +43,11 @@ import {
   downloadDatabaseSpreadsheet
 } from '../services/supabaseClient';
 
-export const AdminView: React.FC = () => {
+interface AdminViewProps {
+  onNavigateToDashboard?: () => void;
+}
+
+export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) => {
   const {
     currentUser,
     users,
@@ -312,15 +316,39 @@ export const AdminView: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm max-w-xl mx-auto text-center my-12">
+      <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm max-w-xl mx-auto text-center my-12 animate-in fade-in duration-200">
         <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-800 flex items-center justify-center mx-auto mb-4 border border-rose-200">
           <Lock className="w-7 h-7" />
         </div>
         <h3 className="text-lg font-bold text-slate-900">Acesso Restrito: Menu do Administrador</h3>
         <p className="text-sm text-slate-600 mt-2">
           Você está conectado como <strong>{currentUser?.name}</strong> no perfil <strong>{currentUser?.role}</strong>.
-          Este menu é exclusivo para o perfil <strong>ADMIN</strong>.
+          Este menu é exclusivo para o perfil <strong>ADMIN</strong> para gestão de usuários, parâmetros de custo e banco de dados.
         </p>
+
+        <div className="mt-5 p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 text-left space-y-2">
+          <span className="font-bold text-slate-900 block">
+            Permissões ativas para o perfil {currentUser?.role}:
+          </span>
+          <ul className="list-disc pl-4 space-y-1 text-slate-600">
+            <li><strong>Dashboard Geral:</strong> Visualização de todos os indicadores e gráficos industriais.</li>
+            <li><strong>Módulos de Desossa:</strong> Acompanhamento por lote de Dianteiro (DT), Traseiro (TR), Costela (CT) e Suíno (DS).</li>
+            {currentUser?.role === 'GERENCIAL' && (
+              <li><strong>Upload & Base:</strong> Ingestão de novos arquivos SisAtak RETQ010 e correções operacionais.</li>
+            )}
+            <li><strong>One Page Reports:</strong> OPR Geral e OPR Cortes consolidados com exportação Excel e impressão A4.</li>
+          </ul>
+        </div>
+
+        {onNavigateToDashboard && (
+          <button
+            type="button"
+            onClick={onNavigateToDashboard}
+            className="mt-6 px-5 py-2.5 bg-rose-900 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm inline-flex items-center gap-2 cursor-pointer"
+          >
+            Ir para o Dashboard Geral
+          </button>
+        )}
       </div>
     );
   }

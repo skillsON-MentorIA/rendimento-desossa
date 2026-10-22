@@ -31,9 +31,10 @@ import { ReportCorrectionsList } from './ReportCorrectionsList';
 
 interface UploadViewProps {
   onSuccessUpload: (newRecordId: string) => void;
+  onNavigateToDashboard?: () => void;
 }
 
-export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
+export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavigateToDashboard }) => {
   const { addRecord, canUpload, currentUser, records, carcassCosts } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'upload' | 'corrections'>('upload');
@@ -212,6 +213,15 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload }) => {
         <p className="text-xs text-slate-500 mt-1">
           Para realizar uploads e incluir novos dados de produção, utilize o perfil <strong>GERENCIAL</strong> ou <strong>ADMIN</strong> na barra lateral.
         </p>
+        {onNavigateToDashboard && (
+          <button
+            type="button"
+            onClick={onNavigateToDashboard}
+            className="mt-5 px-5 py-2.5 bg-rose-900 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm inline-flex items-center gap-2 cursor-pointer"
+          >
+            Ir para o Dashboard Geral
+          </button>
+        )}
       </div>
     );
   }
