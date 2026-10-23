@@ -76,10 +76,27 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   const [newUserEmail, setNewUserEmail] = useState<string>('');
   const [newUserPassword, setNewUserPassword] = useState<string>('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('GERENCIAL');
+  const [showNewUserPassword, setShowNewUserPassword] = useState<boolean>(false);
+
+  // Password visibility in users list table
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, boolean>>({});
+
+  const togglePasswordVisibility = (userId: string) => {
+    setRevealedPasswords((prev) => ({
+      ...prev,
+      [userId]: !prev[userId],
+    }));
+  };
+
+  const handleCopyPassword = (pwd: string, userName: string) => {
+    navigator.clipboard.writeText(pwd);
+    showFeedback(`Senha de ${userName} copiada para a área de transferência!`, 'success');
+  };
 
   // Password change modal
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [changePasswordVal, setChangePasswordVal] = useState<string>('');
+  const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
 
   // Supabase config state
   const [supabaseConfig, setSupabaseConfig] = useState(getSupabaseConfig());
@@ -165,6 +182,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     showFeedback(`Senha do usuário ${editingUser.name} alterada com sucesso!`);
     setEditingUser(null);
     setChangePasswordVal('');
+    setShowEditPassword(false);
   };
 
   // Test Supabase connection
@@ -543,14 +561,24 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       Senha de Acesso: *
                     </label>
-                    <input
-                      type="password"
-                      value={newUserPassword}
-                      onChange={(e) => setNewUserPassword(e.target.value)}
-                      placeholder="Defina a senha"
-                      required
-                      className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20 focus:border-purple-700"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewUserPassword ? 'text' : 'password'}
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                        placeholder="Defina a senha"
+                        required
+                        className="w-full pl-3 pr-9 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20 focus:border-purple-700 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-purple-700 p-0.5 cursor-pointer"
+                        title={showNewUserPassword ? 'Ocultar senha' : 'Ver senha'}
+                      >
+                        {showNewUserPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -668,6 +696,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                   <tr>
                     <th className="py-3 px-4">Usuário</th>
                     <th className="py-3 px-4">Login / E-mail</th>
+                    <th className="py-3 px-4">Senha de Acesso</th>
                     <th className="py-3 px-4">Perfil de Acesso</th>
                     <th className="py-3 px-4">Permissões Permitidas</th>
                     <th className="py-3 px-4 text-center">Ações</th>
@@ -676,6 +705,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                 <tbody className="divide-y divide-slate-100">
                   {users.map((u) => {
                     const isSelf = u.id === currentUser?.id;
+                    const isPwdRevealed = !!revealedPasswords[u.id];
+                    const userPwd = u.password || 'admin123';
+
                     return (
                       <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-4">
@@ -698,6 +730,43 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                         <td className="py-3 px-4 font-mono">
                           <div className="text-slate-900 font-bold">{u.username}</div>
                           <div className="text-[10px] text-slate-500">{u.email}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <div className="font-mono text-xs font-semibold px-2 py-1 rounded bg-slate-50 border border-slate-200 min-w-[95px] flex items-center justify-between text-slate-800">
+                              {isPwdRevealed ? (
+                                <span className="text-purple-950 font-bold tracking-tight select-all">
+                                  {userPwd}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 tracking-widest text-[13px] select-none">
+                                  ••••••••
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => togglePasswordVisibility(u.id)}
+                              className="p-1 text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
+                              title={isPwdRevealed ? 'Ocultar senha' : 'Ver senha configurada'}
+                            >
+                              {isPwdRevealed ? (
+                                <EyeOff className="w-4 h-4 text-purple-700" />
+                              ) : (
+                                <Eye className="w-4 h-4 text-slate-500" />
+                              )}
+                            </button>
+                            {isPwdRevealed && (
+                              <button
+                                type="button"
+                                onClick={() => handleCopyPassword(userPwd, u.name)}
+                                className="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
+                                title="Copiar senha para área de transferência"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <span
@@ -774,35 +843,78 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                     <KeyRound className="w-4 h-4 text-purple-700" />
                     Alterar Senha de {editingUser.name}
                   </h4>
-                  <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+                  <button
+                    onClick={() => {
+                      setEditingUser(null);
+                      setShowEditPassword(false);
+                    }}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    ✕
+                  </button>
                 </div>
+
+                {/* Senha Atual do Usuário */}
+                <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-xs space-y-1">
+                  <span className="text-[11px] font-bold text-purple-900 block">
+                    Senha Atual Configurada:
+                  </span>
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded border border-purple-200 select-all flex-1">
+                      {editingUser.password || 'admin123'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPassword(editingUser.password || 'admin123', editingUser.name)}
+                      className="px-2 py-1 text-[11px] font-semibold text-purple-700 bg-white hover:bg-purple-100 rounded border border-purple-200 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Copiar senha atual"
+                    >
+                      <Copy className="w-3 h-3" />
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+
                 <form onSubmit={handleChangePassword} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Nova Senha:
+                      Definir Nova Senha:
                     </label>
-                    <input
-                      type="password"
-                      value={changePasswordVal}
-                      onChange={(e) => setChangePasswordVal(e.target.value)}
-                      placeholder="Digite a nova senha"
-                      required
-                      className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showEditPassword ? 'text' : 'password'}
+                        value={changePasswordVal}
+                        onChange={(e) => setChangePasswordVal(e.target.value)}
+                        placeholder="Digite a nova senha"
+                        required
+                        className="w-full pl-3 pr-9 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20 font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="absolute right-2.5 top-2 text-slate-400 hover:text-purple-700 p-0.5 cursor-pointer"
+                        title={showEditPassword ? 'Ocultar senha' : 'Ver senha'}
+                      >
+                        {showEditPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
-                      onClick={() => setEditingUser(null)}
-                      className="px-3 py-1.5 text-xs text-slate-600 rounded-lg"
+                      onClick={() => {
+                        setEditingUser(null);
+                        setShowEditPassword(false);
+                      }}
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 rounded-lg cursor-pointer"
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-bold shadow-sm"
+                      className="px-4 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer"
                     >
-                      Salvar Senha
+                      Salvar Nova Senha
                     </button>
                   </div>
                 </form>
