@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Beef,
+  Ham,
   Scale,
   DollarSign,
   AlertTriangle,
@@ -53,15 +54,15 @@ export const SuinoView: React.FC = () => {
 
   // Current active display label
   const activeBatchLabel = React.useMemo(() => {
-    if (selectedBatchId === 'all') return `Consolidado (${allDsRecords.length} Lotes DS)`;
+    if (selectedBatchId === 'all') return `Consolidado (${allDsRecords.length} Lotes SU)`;
     if (dsRecords.length === 1) {
       const r = dsRecords[0];
       return `${r.date.split('-').reverse().join('/')} - ${r.shift} (${formatKg(r.rawMaterialWeightKg, 1)})`;
     }
     if (dsRecords.length > 1) {
-      return `Filtro Selecionado (${dsRecords.length} Lotes DS)`;
+      return `Filtro Selecionado (${dsRecords.length} Lotes SU)`;
     }
-    return 'Nenhum lote DS encontrado';
+    return 'Nenhum lote SU encontrado';
   }, [selectedBatchId, dsRecords, allDsRecords]);
 
   // Aggregate cuts from the resolved Suíno records
@@ -172,8 +173,8 @@ export const SuinoView: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              <Beef className="w-3.5 h-3.5" />
-              SETOR DESOSSA SUÍNO (DS)
+              <Ham className="w-3.5 h-3.5" />
+              SETOR DESOSSA SUÍNO (SU)
             </div>
             <h2 className="text-xl font-bold mt-1 tracking-tight">
               Desossa de Carcaça Suína & Rendimento por Corte
@@ -222,7 +223,7 @@ export const SuinoView: React.FC = () => {
         {/* Rendimento da Desossa (Líquido) */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500 mb-1">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950">Rend. Desossa (DS)</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950">Rend. Desossa (SU)</span>
             <Scale className="w-4 h-4 text-emerald-700" />
           </div>
           <p className="text-xl font-black text-slate-900 tracking-tight">
@@ -310,7 +311,7 @@ export const SuinoView: React.FC = () => {
         <GroupedYieldTable
           summary={groupedYieldSummary}
           title="Balanço de Massa & Rendimento por Tipo de Corte Suíno vs Padrão Oficial"
-          subtitle="Agrupamento oficial dos cortes e subprodutos da desossa suína (DS) com apuração de desvios"
+          subtitle="Agrupamento oficial dos cortes e subprodutos da desossa suína (SU) com apuração de desvios"
         />
       </div>
 

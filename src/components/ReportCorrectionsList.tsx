@@ -10,6 +10,9 @@ import {
   UserCheck,
   Users,
   Beef,
+  Crown,
+  Ham,
+  Bone,
   ArrowUpDown,
   Download,
   CheckCircle2,
@@ -36,7 +39,7 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
   const { records, deleteRecord, correctRecordDetails, benchmarks, canEdit } = useApp();
 
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [filterType, setFilterType] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO'>('ALL');
+  const [filterType, setFilterType] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'COSTELA' | 'SUINO'>('ALL');
   const [filterShift, setFilterShift] = useState<string>('ALL');
   const [editingRecord, setEditingRecord] = useState<ProductionRecord | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<ProductionRecord | null>(null);
@@ -128,7 +131,8 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
               <option value="ALL">Todos os Cortes</option>
               <option value="DIANTEIRO">Dianteiro (DT)</option>
               <option value="TRASEIRO">Traseiro (TR)</option>
-              <option value="SUINO">Suíno (DS)</option>
+              <option value="COSTELA">Costela (CT)</option>
+              <option value="SUINO">Suíno (SU)</option>
             </select>
           </div>
 
@@ -195,6 +199,8 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
               <tbody className="divide-y divide-slate-100">
                 {filteredList.map((rec) => {
                   const isDT = rec.type === 'DIANTEIRO';
+                  const isTR = rec.type === 'TRASEIRO';
+                  const isCT = rec.type === 'COSTELA';
                   const isSU = rec.type === 'SUINO';
                   return (
                     <tr key={rec.id} className="hover:bg-slate-50/90 transition-colors">
@@ -210,13 +216,24 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${
                             isDT
                               ? 'bg-amber-50 text-amber-900 border-amber-200'
-                              : isSU
-                              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                              : 'bg-rose-50 text-rose-900 border-rose-200'
+                              : isTR
+                              ? 'bg-rose-50 text-rose-900 border-rose-200'
+                              : isCT
+                              ? 'bg-orange-50 text-orange-900 border-orange-200'
+                              : 'bg-emerald-50 text-emerald-900 border-emerald-200'
                           }`}
                         >
-                          <Beef className="w-3 h-3" />
-                          {isDT ? 'DT (Dianteiro)' : isSU ? 'DS (Suíno)' : 'TR (Traseiro)'}
+                          {isDT && <Beef className="w-3 h-3 text-amber-700" />}
+                          {isTR && <Crown className="w-3 h-3 text-rose-700" />}
+                          {isCT && <Bone className="w-3 h-3 text-orange-700" />}
+                          {isSU && <Ham className="w-3 h-3 text-emerald-700" />}
+                          {isDT
+                            ? 'DT (Dianteiro)'
+                            : isTR
+                            ? 'TR (Traseiro)'
+                            : isCT
+                            ? 'CT (Costela)'
+                            : 'SU (Suíno)'}
                         </span>
                         <div className="text-[9px] text-slate-400 font-mono mt-0.5">
                           {rec.cuts.length} cortes

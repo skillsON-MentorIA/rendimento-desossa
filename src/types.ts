@@ -31,7 +31,7 @@ export interface OperatorStat {
   operatorId: string;
   name: string;
   shift: 'Turno 1' | 'Turno 2' | 'Turno 3';
-  station: 'Desossa DT' | 'Desossa TR' | 'Desossa DS' | 'Refile/Toalete' | 'Embalagem' | 'Geral';
+  station: 'Desossa DT' | 'Desossa TR' | 'Desossa SU' | 'Desossa CT' | 'Refile/Toalete' | 'Embalagem' | 'Geral';
   kgProcessed: number;
   hoursWorked: number;
   productivityKgPerPerson: number; // kg / pessoa
@@ -47,7 +47,7 @@ export interface ProductionRecord {
   companyName: string;
   emissionTime: string;
   type: CutType; // DT or TR
-  shift: 'Turno 1' | 'Turno 2' | 'Turno 3';
+  shift: 'Turno 1' | 'Turno 2' | 'Turno 3' | string;
   responsibleOperator: string;
   operatorCount: number;
   

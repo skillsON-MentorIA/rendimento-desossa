@@ -49,11 +49,24 @@ export function parseSisAtakReport(
     type = extraParams.type;
   } else {
     const suinoHits = (rawText.match(/SU[IÍ]NO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCA[ÇC]A|MATRIZ|SU\s*-\s*SU[IÍ]NO|DS\s*-\s*SU[IÍ]NO|1110003|Total:\s*(?:SU|DS)|Total Grupo:\s*(?:SU|DS)|PERNIL|PALETA\s*S\/|LOMBO|BISTECA|PANCETA|COSTELINHA/gi) || []).length;
-    const costelaHits = (rawText.match(/COSTELA\s*BOVINA|CT\s*-\s*COSTELA|Total:\s*CT|Total Grupo:\s*CT|1110004|PONTA\s*DE\s*AGULHA|COSTEL[ÃA]O|COSTELA\s*MINGA|COSTELA\s*RIPA|MATAMBRE/gi) || []).length;
+    const costelaHits = (rawText.match(/COSTELA|CT\s*-\s*COSTELA|Total:\s*CT|Total Grupo:\s*CT|1110004|PONTA\s*DE\s*AGULHA|COSTEL[ÃA]O|MINGA|RIPA|MATAMBRE/gi) || []).length;
     const dianteiroHits = (rawText.match(/DIANTEIRO|DT\s*-\s*DIANTEIRO|1110002|Total:\s*DT/gi) || []).length;
     const traseiroHits = (rawText.match(/TRASEIRO|TR\s*-\s*TRASEIRO|1110001|Total:\s*TR/gi) || []).length;
 
-    if (suinoHits > dianteiroHits && suinoHits > traseiroHits && suinoHits > costelaHits) {
+    const hasExplicitCostelaHeader = /CT\s*-\s*COSTELA|1110004|GRUPO.*CT\b|COSTELA\s*BOV/i.test(rawText);
+    const hasExplicitSuinoHeader = /SU\s*-\s*SU[IÍ]NO|DS\s*-\s*SU[IÍ]NO|1110003|GRUPO.*(?:SU|DS)\b|CARCA[ÇC]A\s*SU[IÍ]NA/i.test(rawText);
+    const hasExplicitDianteiroHeader = /DT\s*-\s*DIANTEIRO|1110002|GRUPO.*DT\b/i.test(rawText);
+    const hasExplicitTraseiroHeader = /TR\s*-\s*TRASEIRO|1110001|GRUPO.*TR\b/i.test(rawText);
+
+    if (hasExplicitCostelaHeader && !hasExplicitTraseiroHeader && !hasExplicitDianteiroHeader) {
+      type = 'COSTELA';
+    } else if (hasExplicitSuinoHeader && !hasExplicitTraseiroHeader && !hasExplicitDianteiroHeader) {
+      type = 'SUINO';
+    } else if (hasExplicitDianteiroHeader && !hasExplicitTraseiroHeader) {
+      type = 'DIANTEIRO';
+    } else if (costelaHits > 0 && costelaHits >= traseiroHits && costelaHits > dianteiroHits) {
+      type = 'COSTELA';
+    } else if (suinoHits > dianteiroHits && suinoHits > traseiroHits && suinoHits > costelaHits) {
       type = 'SUINO';
     } else if (costelaHits > dianteiroHits && costelaHits > traseiroHits) {
       type = 'COSTELA';
@@ -158,8 +171,8 @@ export function parseSisAtakReport(
     }
   }
 
-  // Pattern: Total: TR / DT / DS / SU 15.895,695 493,000 98,58 % 28,20 448.200,04
-  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT|DS|SU)\s+([^\n\r]+)/i);
+  // Pattern: Total: TR / DT / CT / DS / SU 15.895,695 493,000 98,58 % 28,20 448.200,04
+  const totalCutsRowMatch = rawText.match(/Total:\s*(?:TR|DT|CT|DS|SU)\s+([^\n\r]+)/i);
   if (totalCutsRowMatch) {
     const nums = [...totalCutsRowMatch[1].matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,4})/g)].map((x) => parseBrNumber(x[1]));
     if (nums.length >= 2) {
@@ -210,7 +223,7 @@ export function parseSisAtakReport(
       }
     }
 
-    if (/BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCACA\s+SUINA|SU[IÍ]NO\s+C\/\s*OSSO/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[123]|211000[123]/i.test(line)) {
+    if (/BOVINO C\/\s*OSSO|CARCA[ÇC]A\s+SU[IÍ]NA|1\/2\s*CARCACA\s+SUINA|SU[IÍ]NO\s+C\/\s*OSSO|COSTELA\s*BOV/i.test(line) || /MAT[ÉE]RIA.PRIMA/i.test(line) || /111000[1-9]|211000[1-9]/i.test(line)) {
       const matchKg = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*KG/i);
       const matchCx = line.match(/(\d{1,3}(?:\.\d{3})*,\d{3})\s*CX/i);
       if (matchKg && rawMaterialWeightKg === 0) {
@@ -225,10 +238,12 @@ export function parseSisAtakReport(
         rawMaterialDesc = '1/2 CARCAÇA SUÍNA MATRIZ';
       } else if (/1\/2\s*CARCACA\s+SUINA/i.test(line)) {
         rawMaterialDesc = '1/2 CARCAÇA SUÍNA';
+      } else if (/COSTELA\s*BOVINA|CT\s*-\s*COSTELA/i.test(line)) {
+        rawMaterialDesc = 'COSTELA BOVINA C/ OSSO';
       }
     }
 
-    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT|DS|SU)/i.test(line)) {
+    if (/Total Mat[ée]ria Prima\s*:/i.test(line) || /Total Grupo:\s*(?:TR|DT|CT|DS|SU)/i.test(line)) {
       const nums = [...line.matchAll(/(\d{1,3}(?:\.\d{3})*,\d{2,3})/g)].map((x) => parseBrNumber(x[1]));
       if (nums.length >= 1 && rawMaterialWeightKg === 0) {
         rawMaterialWeightKg = nums[0];
@@ -355,6 +370,7 @@ export function parseSisAtakReport(
       else if (/PICANHA|FIL[ÉE]\s*MIGNON|CONTRA\s*FIL[ÉE]|ALCATRA|CORA[ÇC][ÃA]O|MAMINHA/i.test(name)) category = 'NOBRE';
       else if (/RECORTE|BANANINHA|NERVO|DESCARTE|MO[ÍI]DA/i.test(name)) category = 'RECORTE';
       else if (type === 'DIANTEIRO') category = 'DIANTEIRO';
+      else if (type === 'COSTELA' || /COSTELA|MINGA|RIPA|MATAMBRE/i.test(name)) category = 'COSTELA';
       else category = 'TRASEIRO';
 
       cuts.push({
@@ -466,10 +482,10 @@ export function parseSisAtakReport(
   const grossProfitValue = finishedProductTotalValue - totalCarcassCost;
   const profitMarginPct = finishedProductTotalValue > 0 ? (grossProfitValue / finishedProductTotalValue) * 100 : 0;
 
-  // 10. Operational Team & Productivity
-  const operatorCount = extraParams.operatorCount ?? (type === 'SUINO' ? 18 : type === 'TRASEIRO' ? 22 : type === 'COSTELA' ? 16 : 20);
+  // 10. Operational Team & Productivity (Padrão: 2 linhas físicas na fábrica de 25 pessoas com Líderes Peu e Vinicius)
+  const operatorCount = extraParams.operatorCount ?? 25;
   const shift = extraParams.shift ?? 'Turno 1';
-  const responsibleOperator = extraParams.responsibleOperator ?? (type === 'SUINO' ? 'Edmar Ferreira' : type === 'TRASEIRO' ? 'Valdemar Nogueira' : type === 'COSTELA' ? 'Carlos Antunes' : 'Marcos Silveira');
+  const responsibleOperator = extraParams.responsibleOperator ?? (type === 'SUINO' ? 'Edmar Ferreira' : type === 'TRASEIRO' ? 'Líder Vinicius' : 'Líder Peu');
   const productivityKgPerPerson = operatorCount > 0 && rawMaterialWeightKg > 0 ? rawMaterialWeightKg / operatorCount : 0;
 
   return {

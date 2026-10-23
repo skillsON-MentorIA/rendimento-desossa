@@ -5,6 +5,7 @@ import {
   FileSpreadsheet,
   Building2,
   Calendar,
+  CalendarRange,
   Layers,
   Scale,
   Users,
@@ -13,6 +14,8 @@ import {
   DollarSign,
   TrendingUp,
   Beef,
+  Crown,
+  Ham,
   Bone,
   Flame,
   ArrowUpRight,
@@ -20,10 +23,11 @@ import {
   Filter,
   FileEdit,
   Trash2,
-  HardDrive
+  HardDrive,
+  FileText
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { ProductionRecord } from '../types';
+import { CutItem, ProductionRecord } from '../types';
 import {
   formatCurrency,
   formatKg,
@@ -32,6 +36,8 @@ import {
   getUnitNoun,
   getRawMaterialUnitTitle,
   cleanRawMaterialName,
+  calculateEffectiveTotalWorkforce,
+  calculateEffectiveDailyWorkforce,
 } from '../utils/calculations';
 import { exportMasterDatabaseToExcel } from '../utils/excelDatabase';
 import { findBenchmarkForCut } from '../utils/benchmarkMatcher';
@@ -58,12 +64,38 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     canEdit,
   } = useApp();
   
-  // Choose record to display: either selected, or first filtered, or first overall
+  // Mode: Lote Individual vs Consolidado Bovino (DT + TR + CT)
+  const [reportMode, setReportMode] = useState<'INDIVIDUAL' | 'CONSOLIDADO'>('INDIVIDUAL');
+
+  // Filter Mode in Consolidated view: Data Única vs Por Período
+  const [dateFilterMode, setDateFilterMode] = useState<'SINGLE' | 'PERIOD'>('SINGLE');
+
+  const availableDates = React.useMemo(() => {
+    return Array.from(new Set(records.map((r) => r.date))).sort().reverse();
+  }, [records]);
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    return filters.date || (records[0]?.date) || '';
+  });
+
+  const [startDate, setStartDate] = useState<string>(() => {
+    if (filters.startDate) return filters.startDate;
+    const sorted = records.map((r) => r.date).sort();
+    return sorted[0] || '';
+  });
+
+  const [endDate, setEndDate] = useState<string>(() => {
+    if (filters.endDate) return filters.endDate;
+    const sorted = records.map((r) => r.date).sort();
+    return sorted[sorted.length - 1] || '';
+  });
+
+  // Choose record to display for individual mode: either selected, or first filtered, or first overall
   const [activeRecordId, setActiveRecordId] = useState<string>(
     selectedRecordId || filteredRecords[0]?.id || records[0]?.id || ''
   );
 
-  // Managerial Type Filter for One Page Report (DT vs TR vs CT vs DS vs ALL)
+  // Managerial Type Filter for Individual One Page Report (DT vs TR vs CT vs SU vs ALL)
   const [reportTypeFilter, setReportTypeFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'COSTELA' | 'SUINO'>(() => {
     return filters.type !== 'ALL' ? filters.type : 'ALL';
   });
@@ -81,15 +113,130 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  // Filtered records list for lot selection dropdown
+  // Filtered records list for lot selection dropdown (Individual Mode)
   const availableRecords = React.useMemo(() => {
     if (reportTypeFilter === 'ALL') return records;
     return records.filter((r) => r.type === reportTypeFilter);
   }, [records, reportTypeFilter]);
 
-  const activeRecord = records.find((r) => r.id === activeRecordId) || availableRecords[0] || records[0];
+  // Consolidated Bovino Data (DT + TR + CT strictly excluding SUINO)
+  const consolidatedBovineData = React.useMemo(() => {
+    if (reportMode !== 'CONSOLIDADO') return null;
 
-  // Handle line type filter change (DT vs TR vs CT vs DS vs ALL)
+    const matching = records.filter((r) => {
+      // Exclui suíno rigorosamente do consolidado bovino
+      if (r.type === 'SUINO') return false;
+
+      if (dateFilterMode === 'SINGLE') {
+        return r.date === selectedDate;
+      } else {
+        if (startDate && r.date < startDate) return false;
+        if (endDate && r.date > endDate) return false;
+        return true;
+      }
+    });
+
+    if (matching.length === 0) return null;
+
+    const rawMaterialWeightKg = matching.reduce((sum, r) => sum + r.rawMaterialWeightKg, 0);
+    const finishedProductWeightKg = matching.reduce((sum, r) => sum + r.finishedProductWeightKg, 0);
+    const saleableCutsWeightKg = matching.reduce((sum, r) => sum + r.saleableCutsWeightKg, 0);
+    const rawMaterialBoxes = matching.reduce((sum, r) => sum + (r.rawMaterialBoxes || 0), 0);
+    const boneWeightKg = matching.reduce((sum, r) => sum + (r.boneWeightKg || 0), 0);
+    const fatWeightKg = matching.reduce((sum, r) => sum + (r.fatWeightKg || 0), 0);
+    const lossKg = matching.reduce((sum, r) => sum + r.lossKg, 0);
+    const finishedProductTotalValue = matching.reduce((sum, r) => sum + r.finishedProductTotalValue, 0);
+    const totalCarcassCost = matching.reduce((sum, r) => sum + r.totalCarcassCost, 0);
+    const grossProfitValue = finishedProductTotalValue - totalCarcassCost;
+    const carcassCostPerKg = rawMaterialWeightKg > 0 ? totalCarcassCost / rawMaterialWeightKg : 0;
+    const lossPct = rawMaterialWeightKg > 0 ? (lossKg / rawMaterialWeightKg) * 100 : 0;
+    const totalYieldPct = rawMaterialWeightKg > 0 ? (finishedProductWeightKg / rawMaterialWeightKg) * 100 : 0;
+    const deboningYieldNetPct = rawMaterialWeightKg > 0 ? (saleableCutsWeightKg / rawMaterialWeightKg) * 100 : 0;
+    const profitMarginPct = finishedProductTotalValue > 0 ? (grossProfitValue / finishedProductTotalValue) * 100 : 0;
+
+    // Consolidação de equipe conforme regra de máximo 2 linhas físicas (50 pessoas máx por dia)
+    const operatorCount = calculateEffectiveTotalWorkforce(matching);
+    const productivityKgPerPerson = operatorCount > 0 ? rawMaterialWeightKg / operatorCount : 0;
+
+    // Consolidação de cortes (somando pesos e valores de cortes com mesmo nome/código)
+    const cutMap: Record<string, CutItem> = {};
+    matching.forEach((r) => {
+      r.cuts.forEach((c) => {
+        const cleanKey = c.name.trim().toUpperCase();
+        if (!cutMap[cleanKey]) {
+          cutMap[cleanKey] = {
+            ...c,
+            id: `cons-${c.code}-${cleanKey}`,
+            weightKg: 0,
+            boxesCount: 0,
+            totalPrice: 0,
+            yieldActualPct: 0,
+          };
+        }
+        cutMap[cleanKey].weightKg += c.weightKg;
+        cutMap[cleanKey].boxesCount = (cutMap[cleanKey].boxesCount || 0) + (c.boxesCount || 0);
+        cutMap[cleanKey].totalPrice += c.totalPrice;
+      });
+    });
+
+    const cuts = Object.values(cutMap).map((c) => {
+      const yieldActualPct = rawMaterialWeightKg > 0 ? (c.weightKg / rawMaterialWeightKg) * 100 : 0;
+      const unitPrice = c.weightKg > 0 ? c.totalPrice / c.weightKg : c.unitPrice;
+      return {
+        ...c,
+        yieldActualPct,
+        unitPrice,
+      };
+    });
+
+    const displayDate = dateFilterMode === 'SINGLE'
+      ? (selectedDate ? selectedDate.split('-').reverse().join('/') : '')
+      : `${startDate.split('-').reverse().join('/')} a ${endDate.split('-').reverse().join('/')}`;
+
+    const rec: ProductionRecord = {
+      id: 'consolidado-bovino-opr',
+      date: dateFilterMode === 'SINGLE' ? selectedDate : `${startDate}_${endDate}`,
+      shift: dateFilterMode === 'SINGLE' ? 'Consolidado Diário' : 'Consolidado Período',
+      type: 'DIANTEIRO', // Tipo interno para compatibilidade
+      rawMaterialCode: '1110000',
+      rawMaterialDesc: 'CONSOLIDADO GERAL BOVINO (DT + TR + CT)',
+      rawMaterialWeightKg,
+      rawMaterialBoxes,
+      rawMaterialAvgWeightKg: rawMaterialBoxes > 0 ? rawMaterialWeightKg / rawMaterialBoxes : 0,
+      carcassCostPerKg,
+      totalCarcassCost,
+      finishedProductWeightKg,
+      finishedProductTotalValue,
+      saleableCutsWeightKg,
+      boneWeightKg,
+      fatWeightKg,
+      nonSaleableWeightKg: boneWeightKg + fatWeightKg,
+      lossKg,
+      lossPct,
+      deboningYieldNetPct,
+      totalYieldPct,
+      nonSaleablePct: rawMaterialWeightKg > 0 ? ((boneWeightKg + fatWeightKg) / rawMaterialWeightKg) * 100 : 0,
+      bonePct: rawMaterialWeightKg > 0 ? (boneWeightKg / rawMaterialWeightKg) * 100 : 0,
+      fatPct: rawMaterialWeightKg > 0 ? (fatWeightKg / rawMaterialWeightKg) * 100 : 0,
+      grossProfitValue,
+      profitMarginPct,
+      operatorCount,
+      productivityKgPerPerson,
+      responsibleOperator: 'Líder Peu (Linha 1) / Líder Vinicius (Linha 2)',
+      emissionTime: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      preDebonedInputKg: 0,
+      deboningEffectiveMeatKg: saleableCutsWeightKg,
+      cuts,
+    };
+
+    return { rec, matchingCount: matching.length, displayDate };
+  }, [reportMode, records, dateFilterMode, selectedDate, startDate, endDate]);
+
+  const activeRecord = reportMode === 'CONSOLIDADO'
+    ? (consolidatedBovineData?.rec || records[0])
+    : (records.find((r) => r.id === activeRecordId) || availableRecords[0] || records[0]);
+
+  // Handle line type filter change (DT vs TR vs CT vs SU vs ALL)
   const handleFilterTypeChange = (type: 'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'COSTELA' | 'SUINO') => {
     setReportTypeFilter(type);
     if (type === 'ALL') return;
@@ -111,11 +258,11 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
     }
   };
 
-  // Find complementary parallel record on the same date
+  // Find complementary parallel record on the same date (Individual Mode only)
   const parallelRecordsSameDate = React.useMemo(() => {
-    if (!activeRecord) return [];
+    if (reportMode === 'CONSOLIDADO' || !activeRecord) return [];
     return records.filter((r) => r.date === activeRecord.date && r.id !== activeRecord.id);
-  }, [records, activeRecord]);
+  }, [records, activeRecord, reportMode]);
 
   const handlePrint = () => {
     window.print();
@@ -360,128 +507,240 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Seletor de Linha de Processamento: DT vs TR vs CT vs DS vs Todos */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
-            <span className="text-[10px] uppercase font-bold text-slate-500 px-1 flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-rose-800" />
-              Linha:
-            </span>
+          {/* Seletor Principal de Modo: Lote Individual vs Consolidado Bovino */}
+          <div className="inline-flex rounded-lg p-1 bg-slate-100 border border-slate-200 text-xs font-semibold">
             <button
               type="button"
-              id="btn-report-filter-all"
-              onClick={() => handleFilterTypeChange('ALL')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                reportTypeFilter === 'ALL'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+              onClick={() => setReportMode('INDIVIDUAL')}
+              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                reportMode === 'INDIVIDUAL'
+                  ? 'bg-slate-900 text-white shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Todos ({records.length})
+              <FileText className="w-3.5 h-3.5" />
+              Lote Individual
             </button>
             <button
               type="button"
-              id="btn-report-filter-dt"
-              onClick={() => handleFilterTypeChange('DIANTEIRO')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                reportTypeFilter === 'DIANTEIRO'
-                  ? 'bg-amber-600 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-amber-800'
+              onClick={() => setReportMode('CONSOLIDADO')}
+              className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                reportMode === 'CONSOLIDADO'
+                  ? 'bg-rose-900 text-white shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Beef className="w-3.5 h-3.5" />
-              Dianteiro (DT)
-              <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'DIANTEIRO' ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-900'}`}>
-                {records.filter(r => r.type === 'DIANTEIRO').length}
-              </span>
-            </button>
-            <button
-              type="button"
-              id="btn-report-filter-tr"
-              onClick={() => handleFilterTypeChange('TRASEIRO')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                reportTypeFilter === 'TRASEIRO'
-                  ? 'bg-rose-800 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-rose-800'
-              }`}
-            >
-              <Beef className="w-3.5 h-3.5" />
-              Traseiro (TR)
-              <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'TRASEIRO' ? 'bg-rose-950 text-white' : 'bg-rose-100 text-rose-900'}`}>
-                {records.filter(r => r.type === 'TRASEIRO').length}
-              </span>
-            </button>
-            <button
-              type="button"
-              id="btn-report-filter-ct"
-              onClick={() => handleFilterTypeChange('COSTELA')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                reportTypeFilter === 'COSTELA'
-                  ? 'bg-orange-600 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-orange-800'
-              }`}
-            >
-              <Beef className="w-3.5 h-3.5" />
-              Costela (CT)
-              <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'COSTELA' ? 'bg-orange-950 text-white' : 'bg-orange-100 text-orange-900'}`}>
-                {records.filter(r => r.type === 'COSTELA').length}
-              </span>
-            </button>
-            <button
-              type="button"
-              id="btn-report-filter-ds"
-              onClick={() => handleFilterTypeChange('SUINO')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                reportTypeFilter === 'SUINO'
-                  ? 'bg-emerald-700 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-emerald-800'
-              }`}
-            >
-              <Beef className="w-3.5 h-3.5" />
-              Suíno (DS)
-              <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'SUINO' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-900'}`}>
-                {records.filter(r => r.type === 'SUINO').length}
-              </span>
+              <Layers className="w-3.5 h-3.5" />
+              Consolidado (DT + TR + CT)
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
-            <Calendar className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-slate-500">Lote:</span>
-            <select
-              value={activeRecordId}
-              onChange={(e) => setActiveRecordId(e.target.value)}
-              className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[210px] truncate"
-            >
-              {availableRecords.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : r.type === 'SUINO' ? 'DS' : r.type === 'COSTELA' ? 'CT' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Controles para MODO CONSOLIDADO (Data Única vs Por Período) */}
+          {reportMode === 'CONSOLIDADO' ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex rounded-lg p-1 bg-rose-50 border border-rose-200 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setDateFilterMode('SINGLE')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    dateFilterMode === 'SINGLE'
+                      ? 'bg-rose-900 text-white shadow-xs font-bold'
+                      : 'text-rose-900 hover:bg-rose-100'
+                  }`}
+                >
+                  <Calendar className="w-3 h-3" />
+                  Data Única
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateFilterMode('PERIOD')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    dateFilterMode === 'PERIOD'
+                      ? 'bg-rose-900 text-white shadow-xs font-bold'
+                      : 'text-rose-900 hover:bg-rose-100'
+                  }`}
+                >
+                  <CalendarRange className="w-3 h-3" />
+                  Por Período
+                </button>
+              </div>
 
-          {/* Quick Manager Actions: Edit & Delete if error */}
-          {canEdit && (
-            <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200">
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="px-2.5 py-1.5 hover:bg-amber-100 text-amber-900 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                title="Corrigir parâmetros operacionais deste lote (Líder, Operadores, Custo da matéria-prima)"
-              >
-                <FileEdit className="w-3.5 h-3.5" />
-                <span>Corrigir</span>
-              </button>
+              {dateFilterMode === 'SINGLE' ? (
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
+                  <span className="font-bold text-slate-600">Data:</span>
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  >
+                    {availableDates.map((d) => (
+                      <option key={d} value={d}>
+                        {d.split('-').reverse().join('/')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-rose-50/70 border border-rose-200 rounded-lg px-2.5 py-1 text-xs">
+                  <span className="text-rose-900 font-bold">De:</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-900 font-bold text-xs"
+                  />
+                  <span className="text-rose-900 font-bold">Até:</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="bg-white border border-slate-300 rounded px-1.5 py-0.5 text-slate-900 font-bold text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sorted = availableDates.slice().sort();
+                      setStartDate(sorted[0] || '');
+                      setEndDate(sorted[sorted.length - 1] || '');
+                    }}
+                    className="px-2 py-0.5 bg-rose-900 hover:bg-rose-800 text-white font-semibold rounded text-[11px] transition-colors"
+                  >
+                    Todo o Período
+                  </button>
+                </div>
+              )}
 
-              <button
-                type="button"
-                onClick={() => setIsDeleting(true)}
-                className="px-2.5 py-1.5 hover:bg-rose-100 text-rose-800 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                title="Excluir este relatório caso tenha sido importado incorretamente"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Excluir</span>
-              </button>
+              <span className="px-2 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold">
+                {consolidatedBovineData?.matchingCount || 0} lote(s) bovino(s)
+              </span>
+            </div>
+          ) : (
+            /* Controles para MODO LOTE INDIVIDUAL */
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Seletor de Linha de Processamento: DT vs TR vs CT vs SU vs Todos */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs font-semibold">
+                <span className="text-[10px] uppercase font-bold text-slate-500 px-1 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-rose-800" />
+                  Linha:
+                </span>
+                <button
+                  type="button"
+                  id="btn-report-filter-all"
+                  onClick={() => handleFilterTypeChange('ALL')}
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                    reportTypeFilter === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Todos ({records.length})
+                </button>
+                <button
+                  type="button"
+                  id="btn-report-filter-dt"
+                  onClick={() => handleFilterTypeChange('DIANTEIRO')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    reportTypeFilter === 'DIANTEIRO'
+                      ? 'bg-amber-600 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-amber-800'
+                  }`}
+                >
+                  <Beef className="w-3.5 h-3.5" />
+                  Dianteiro (DT)
+                  <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'DIANTEIRO' ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-900'}`}>
+                    {records.filter(r => r.type === 'DIANTEIRO').length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-report-filter-tr"
+                  onClick={() => handleFilterTypeChange('TRASEIRO')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    reportTypeFilter === 'TRASEIRO'
+                      ? 'bg-rose-800 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-rose-800'
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  Traseiro (TR)
+                  <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'TRASEIRO' ? 'bg-rose-950 text-white' : 'bg-rose-100 text-rose-900'}`}>
+                    {records.filter(r => r.type === 'TRASEIRO').length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-report-filter-ct"
+                  onClick={() => handleFilterTypeChange('COSTELA')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    reportTypeFilter === 'COSTELA'
+                      ? 'bg-orange-600 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-orange-800'
+                  }`}
+                >
+                  <Bone className="w-3.5 h-3.5" />
+                  Costela (CT)
+                  <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'COSTELA' ? 'bg-orange-950 text-white' : 'bg-orange-100 text-orange-900'}`}>
+                    {records.filter(r => r.type === 'COSTELA').length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  id="btn-report-filter-su"
+                  onClick={() => handleFilterTypeChange('SUINO')}
+                  className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                    reportTypeFilter === 'SUINO'
+                      ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                      : 'text-slate-700 hover:text-emerald-800'
+                  }`}
+                >
+                  <Ham className="w-3.5 h-3.5" />
+                  Suíno (SU)
+                  <span className={`text-[10px] px-1 rounded-full font-mono ${reportTypeFilter === 'SUINO' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-900'}`}>
+                    {records.filter(r => r.type === 'SUINO').length}
+                  </span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-slate-500">Lote:</span>
+                <select
+                  value={activeRecordId}
+                  onChange={(e) => setActiveRecordId(e.target.value)}
+                  className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[210px] truncate"
+                >
+                  {availableRecords.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : r.type === 'SUINO' ? 'SU' : r.type === 'COSTELA' ? 'CT' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick Manager Actions: Edit & Delete if error */}
+              {canEdit && (
+                <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="px-2.5 py-1.5 hover:bg-amber-100 text-amber-900 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Corrigir parâmetros operacionais deste lote (Líder, Operadores, Custo da matéria-prima)"
+                  >
+                    <FileEdit className="w-3.5 h-3.5" />
+                    <span>Corrigir</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleting(true)}
+                    className="px-2.5 py-1.5 hover:bg-rose-100 text-rose-800 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Excluir este relatório caso tenha sido importado incorretamente"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Excluir</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -600,32 +859,48 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
             <div className="mt-1 pt-1 border-t border-slate-200 grid grid-cols-5 gap-1.5 text-xs bg-white border border-slate-200 p-1.5 rounded">
               <div>
                 <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Data Operação:</span>
-                <span className="font-black text-slate-900 text-[10.5px]">{activeRecord.date.split('-').reverse().join('/')}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Linha de Desossa:</span>
-                <span className={`inline-flex items-center gap-1 font-black uppercase text-[9.5px] px-1 py-0.2 rounded border ${
-                  activeRecord.type === 'DIANTEIRO'
-                    ? 'bg-amber-100 text-amber-900 border-amber-300'
-                    : activeRecord.type === 'SUINO'
-                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                    : activeRecord.type === 'COSTELA'
-                    ? 'bg-orange-100 text-orange-900 border-orange-300'
-                    : 'bg-rose-100 text-rose-900 border-rose-300'
-                }`}>
-                  <Beef className="w-2.5 h-2.5" />
-                  {activeRecord.type === 'DIANTEIRO'
-                    ? 'Dianteiro (DT)'
-                    : activeRecord.type === 'SUINO'
-                    ? 'Suíno (DS)'
-                    : activeRecord.type === 'COSTELA'
-                    ? 'Costela (CT)'
-                    : 'Traseiro (TR)'}
+                <span className="font-black text-slate-900 text-[10.5px]">
+                  {reportMode === 'CONSOLIDADO'
+                    ? (consolidatedBovineData?.displayDate || activeRecord.date)
+                    : activeRecord.date.split('-').reverse().join('/')}
                 </span>
               </div>
               <div>
+                <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Linha de Desossa:</span>
+                {reportMode === 'CONSOLIDADO' ? (
+                  <span className="inline-flex items-center gap-1 font-black uppercase text-[9px] px-1 py-0.2 rounded border bg-blue-100 text-blue-950 border-blue-300">
+                    <Layers className="w-2.5 h-2.5 text-blue-900" />
+                    Consolidado (DT+TR+CT)
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center gap-1 font-black uppercase text-[9.5px] px-1 py-0.2 rounded border ${
+                    activeRecord.type === 'DIANTEIRO'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : activeRecord.type === 'SUINO'
+                      ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                      : activeRecord.type === 'COSTELA'
+                      ? 'bg-orange-100 text-orange-900 border-orange-300'
+                      : 'bg-rose-100 text-rose-900 border-rose-300'
+                  }`}>
+                    {activeRecord.type === 'DIANTEIRO' && <Beef className="w-2.5 h-2.5" />}
+                    {activeRecord.type === 'TRASEIRO' && <Crown className="w-2.5 h-2.5" />}
+                    {activeRecord.type === 'COSTELA' && <Bone className="w-2.5 h-2.5" />}
+                    {activeRecord.type === 'SUINO' && <Ham className="w-2.5 h-2.5" />}
+                    {activeRecord.type === 'DIANTEIRO'
+                      ? 'Dianteiro (DT)'
+                      : activeRecord.type === 'SUINO'
+                      ? 'Suíno (SU)'
+                      : activeRecord.type === 'COSTELA'
+                      ? 'Costela (CT)'
+                      : 'Traseiro (TR)'}
+                  </span>
+                )}
+              </div>
+              <div>
                 <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Turno / Equipe:</span>
-                <span className="font-bold text-slate-900 text-[10.5px]">{activeRecord.shift} ({activeRecord.operatorCount} pess.)</span>
+                <span className="font-bold text-slate-900 text-[10.5px]">
+                  {activeRecord.shift} ({activeRecord.operatorCount} pess.{reportMode === 'CONSOLIDADO' ? ' máx 2 lin.' : ''})
+                </span>
               </div>
               <div>
                 <span className="text-slate-500 block text-[8.5px] uppercase font-bold">Líder / Responsável:</span>
@@ -635,7 +910,10 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
                 <span className="text-slate-500 block text-[8.5px] uppercase font-bold">
                   Custo Base {activeRecord.type === 'SUINO' ? 'Carcaça' : 'Peça'}:
                 </span>
-                <span className="font-black text-slate-900 text-[10.5px] font-mono">{formatCurrency(activeRecord.carcassCostPerKg)}/kg</span>
+                <span className="font-black text-slate-900 text-[10.5px] font-mono">
+                  {formatCurrency(activeRecord.carcassCostPerKg)}/kg
+                  {reportMode === 'CONSOLIDADO' ? ' (médio)' : ''}
+                </span>
               </div>
             </div>
           </div>
@@ -646,7 +924,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-700" />
-                  Indicadores da Operação do Dia / Lote ({activeRecord.date.split('-').reverse().join('/')})
+                  Indicadores da Operação • {reportMode === 'CONSOLIDADO' ? (consolidatedBovineData?.displayDate || 'Consolidado') : activeRecord.date.split('-').reverse().join('/')}
                 </span>
                 <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-rose-100 text-rose-900 border border-rose-200 tracking-wide font-mono">
                   {cleanRawMaterialName(activeRecord.rawMaterialDesc) || (
@@ -853,7 +1131,7 @@ export const OnePageReport: React.FC<OnePageReportProps> = ({
               <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200">
                 <div className="flex items-center gap-1.5">
                   <h3 className="text-[10.5px] font-black uppercase tracking-wider text-slate-900">
-                    Rendimento dos Cortes ({activeRecord.type === 'DIANTEIRO' ? 'Dianteiro' : activeRecord.type === 'SUINO' ? 'Suíno' : activeRecord.type === 'COSTELA' ? 'Costela' : 'Traseiro'})
+                    Rendimento dos Cortes ({reportMode === 'CONSOLIDADO' ? 'Consolidado Bovino DT + TR + CT' : activeRecord.type === 'DIANTEIRO' ? 'Dianteiro' : activeRecord.type === 'SUINO' ? 'Suíno' : activeRecord.type === 'COSTELA' ? 'Costela' : 'Traseiro'})
                   </h3>
                   <span className="text-[9px] text-slate-500 font-semibold">
                     • Todos os {displayedCuts.length} cortes discriminados individualmente

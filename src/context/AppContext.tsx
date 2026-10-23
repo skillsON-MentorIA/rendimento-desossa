@@ -178,6 +178,21 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
     };
   }
 
+  // Verificar se é COSTELA mesmo que tenha sido classificado incorretamente como TRASEIRO
+  const isActuallyCostela = r.type === 'COSTELA' ||
+    /COSTELA|PONTA\s*DE\s*AGULHA|COSTEL[ÃA]O|1110004/i.test(rawDescCleaned || '') ||
+    r.rawMaterialCode?.includes('1110004') ||
+    (r.cuts && r.cuts.some((c) => /COSTELA\s*BOV|MINGA|RIPA|MATAMBRE/i.test(c.name)));
+
+  let effectiveType: CutType = r.type;
+  let effectiveDesc = rawDescCleaned;
+  if (isActuallyCostela && !isActuallySuino) {
+    effectiveType = 'COSTELA';
+    if (!/COSTELA/i.test(effectiveDesc || '')) {
+      effectiveDesc = 'COSTELA BOVINA C/ OSSO';
+    }
+  }
+
   // BOVINO (DT, TR, COSTELA):
   // REGRA OFICIAL SOLICITADA PELA DIRETORIA:
   // Considerar como OSSO na soma do subproduto Osso SOMENTE os registros no relatório ATAK que tenham o código/prefixo X-MP.
@@ -205,17 +220,21 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
       };
     }
 
-    // Se anteriormente foi classificado como osso subproduto sem ter X-MP (ex: CXGG - OSSO PATINHO)
-    if (cut.category === 'SUBPRODUTO_OSSO' || cut.isNonSaleable) {
-      const defaultCat = r.type === 'DIANTEIRO' ? 'DIANTEIRO' as const : r.type === 'COSTELA' ? 'RECORTE' as const : 'TRASEIRO' as const;
-      return {
-        ...cut,
-        isNonSaleable: false,
-        category: defaultCat,
-      };
+    // Categoria do corte vendável
+    let category: CutItem['category'];
+    if (effectiveType === 'COSTELA' || /COSTELA|MINGA|RIPA|MATAMBRE/i.test(cut.name)) {
+      category = /RECORTE/i.test(cut.name) ? 'RECORTE' : 'COSTELA';
+    } else if (effectiveType === 'DIANTEIRO') {
+      category = /RECORTE|MOIDA/i.test(cut.name) ? 'RECORTE' : 'DIANTEIRO';
+    } else {
+      category = /PICANHA|FIL[ÉE]|ALCATRA|CONTRA|MAMINHA/i.test(cut.name) ? 'NOBRE' : /RECORTE/i.test(cut.name) ? 'RECORTE' : 'TRASEIRO';
     }
 
-    return cut;
+    return {
+      ...cut,
+      isNonSaleable: false,
+      category,
+    };
   });
 
   const boneWeightKg = updatedCuts.filter((c) => c.category === 'SUBPRODUTO_OSSO').reduce((a, b) => a + b.weightKg, 0);
@@ -236,7 +255,8 @@ function sanitizeProductionRecord(r: ProductionRecord, currentSuinoCost: number 
 
   return {
     ...r,
-    rawMaterialDesc: rawDescCleaned,
+    type: effectiveType,
+    rawMaterialDesc: effectiveDesc,
     cuts: updatedCuts,
     boneWeightKg,
     fatWeightKg,
@@ -511,7 +531,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!r.date.startsWith(filters.month)) return false;
       }
 
-      if (filters.type !== 'ALL' && r.type !== filters.type) return false;
+      if (filters.type === 'ALL') {
+        // Consolidado Geral: exclui a Desossa Suína (SU), consolidando estritamente DT, TR e CT (bovinos)
+        if (r.type === 'SUINO') return false;
+      } else if (r.type !== filters.type) {
+        return false;
+      }
       if (filters.shift !== 'ALL' && r.shift !== filters.shift) return false;
       if (filters.operator !== 'ALL' && r.responsibleOperator !== filters.operator) return false;
 

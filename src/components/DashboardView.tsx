@@ -17,6 +17,8 @@ import {
   ArrowUpRight,
   Info,
   Beef,
+  Crown,
+  Ham,
   FileSpreadsheet
 } from 'lucide-react';
 import {
@@ -34,7 +36,7 @@ import {
   LabelList
 } from 'recharts';
 import { useApp } from '../context/AppContext';
-import { calculateSummary, formatCurrency, formatKg, formatPct, formatWeightNum } from '../utils/calculations';
+import { calculateSummary, calculateEffectiveDailyWorkforce, formatCurrency, formatKg, formatPct, formatWeightNum } from '../utils/calculations';
 
 interface DashboardViewProps {
   onSelectRecord: (recordId: string) => void;
@@ -80,8 +82,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Prepare weekly chart data by date (from Monday to Saturday)
   const weeklyData = React.useMemo(() => {
-    // Sort all records chronologically
-    const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+    // Filter records according to active line filter (if ALL, strictly consolidate bovine DT, TR, CT)
+    const baseRecords = records.filter((r) => {
+      if (filters.type === 'ALL') {
+        return r.type !== 'SUINO';
+      }
+      return r.type === filters.type;
+    });
+
+    const sorted = [...baseRecords].sort((a, b) => a.date.localeCompare(b.date));
     const byDate: Record<string, {
       date: string;
       diaSemana: string;
@@ -98,10 +107,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       profitMarginPct: number;
       faturamentoPA: number;
       custoCarcaça: number;
-      dtCount: number;
-      trCount: number;
-      ctCount: number;
-      dsCount: number;
+      records: typeof records;
     }> = {};
 
     sorted.forEach((r) => {
@@ -127,13 +133,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           profitMarginPct: 0,
           faturamentoPA: 0,
           custoCarcaça: 0,
-          dtCount: 0,
-          trCount: 0,
-          ctCount: 0,
-          dsCount: 0,
+          records: [],
         };
       }
 
+      byDate[d].records.push(r);
       byDate[d].rawWeightKg += r.rawMaterialWeightKg;
       byDate[d].finishedWeightKg += r.finishedProductWeightKg;
       byDate[d].saleableKg += r.saleableCutsWeightKg;
@@ -141,10 +145,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       byDate[d].faturamentoPA += r.finishedProductTotalValue;
       byDate[d].custoCarcaça += r.totalCarcassCost;
       byDate[d].grossProfitValue += r.grossProfitValue;
-      if (r.type === 'DIANTEIRO') byDate[d].dtCount++;
-      if (r.type === 'TRASEIRO') byDate[d].trCount++;
-      if (r.type === 'COSTELA') byDate[d].ctCount++;
-      if (r.type === 'SUINO') byDate[d].dsCount++;
     });
 
     return Object.values(byDate).map((item) => {
@@ -158,8 +158,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       const totalYieldPct = item.rawWeightKg > 0 ? (item.finishedWeightKg / item.rawWeightKg) * 100 : 0;
       const nonSaleablePct = item.rawWeightKg > 0 ? (nonSaleableWeight / item.rawWeightKg) * 100 : 0;
       const profitMarginPct = item.faturamentoPA > 0 ? (item.grossProfitValue / item.faturamentoPA) * 100 : 0;
-      const totalOperators = (item.dtCount * 20 + item.trCount * 22 + item.ctCount * 16 + item.dsCount * 18) || 20;
-      const productivityKgPerPerson = item.rawWeightKg / totalOperators;
+      
+      // Consolidação de equipe diária conforme regra das 2 linhas (max 50 pessoas por dia)
+      const dailyWorkforce = calculateEffectiveDailyWorkforce(item.records);
+      const productivityKgPerPerson = dailyWorkforce > 0 ? item.rawWeightKg / dailyWorkforce : 0;
 
       return {
         ...item,
@@ -171,17 +173,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         productivityKgPerPerson: Number(productivityKgPerPerson.toFixed(1)),
       };
     });
-  }, [records]);
+  }, [records, filters.type]);
 
-  // Specific subsets for DT, TR, CT and DS dynamic comparisons
+  // Specific subsets for DT, TR, CT and SU dynamic comparisons
   const dtRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'DIANTEIRO'), [filteredRecords]);
   const trRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'TRASEIRO'), [filteredRecords]);
   const ctRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'COSTELA'), [filteredRecords]);
-  const dsRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'SUINO'), [filteredRecords]);
+  const suRecords = useMemo(() => filteredRecords.filter((r) => r.type === 'SUINO'), [filteredRecords]);
   const dtSummary = useMemo(() => calculateSummary(dtRecords), [dtRecords]);
   const trSummary = useMemo(() => calculateSummary(trRecords), [trRecords]);
   const ctSummary = useMemo(() => calculateSummary(ctRecords), [ctRecords]);
-  const dsSummary = useMemo(() => calculateSummary(dsRecords), [dsRecords]);
+  const suSummary = useMemo(() => calculateSummary(suRecords), [suRecords]);
 
   // Current active period records (to detect when DT and TR occur on the same day or month)
   const periodAllRecords = useMemo(() => {
@@ -204,11 +206,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const countDtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'DIANTEIRO').length, [periodAllRecords]);
   const countTrInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'TRASEIRO').length, [periodAllRecords]);
   const countCtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'COSTELA').length, [periodAllRecords]);
-  const countDsInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').length, [periodAllRecords]);
+  const countSuInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').length, [periodAllRecords]);
   const kgDtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'DIANTEIRO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
   const kgTrInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'TRASEIRO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
   const kgCtInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'COSTELA').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
-  const kgDsInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
+  const kgSuInPeriod = useMemo(() => periodAllRecords.filter((r) => r.type === 'SUINO').reduce((acc, r) => acc + r.rawMaterialWeightKg, 0), [periodAllRecords]);
 
   // Target benchmarks
   const TARGET_DEBONING_YIELD = 76.5; // Meta de rendimento desossa (carnes vendáveis sobre peso da carcaça)
@@ -241,7 +243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        {/* Action navigation buttons */}
+        {/* Action navigation buttons com ícones personalizados */}
         <div className="flex items-center gap-2">
           <button
             onClick={onNavigateToDianteiro}
@@ -254,22 +256,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onClick={onNavigateToTraseiro}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
-            <Beef className="w-4 h-4 text-rose-400" />
+            <Crown className="w-4 h-4 text-rose-400" />
             Ver Traseiro (TR)
           </button>
           <button
             onClick={onNavigateToCostela}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
-            <Beef className="w-4 h-4 text-amber-300" />
+            <Bone className="w-4 h-4 text-orange-400" />
             Ver Costela (CT)
           </button>
           <button
             onClick={onNavigateToSuino}
             className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5"
           >
-            <Beef className="w-4 h-4 text-emerald-400" />
-            Ver Suíno (DS)
+            <Ham className="w-4 h-4 text-emerald-400" />
+            Ver Suíno (SU)
           </button>
           <button
             onClick={onNavigateToOnePage}
@@ -512,7 +514,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }`}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Consolidado Geral (DT + TR + CT + DS)
+                Consolidado Geral (DT + TR + CT)
               </button>
 
               <button
@@ -546,7 +548,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'text-slate-700 hover:text-rose-800'
                 }`}
               >
-                <Beef className="w-3.5 h-3.5" />
+                <Crown className="w-3.5 h-3.5" />
                 Desossa Traseira (TR)
                 {countTrInPeriod > 0 && (
                   <span
@@ -568,7 +570,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'text-slate-700 hover:text-orange-800'
                 }`}
               >
-                <Beef className="w-3.5 h-3.5" />
+                <Bone className="w-3.5 h-3.5" />
                 Desossa Costela (CT)
                 {countCtInPeriod > 0 && (
                   <span
@@ -582,7 +584,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
 
               <button
-                id="btn-filter-line-ds"
+                id="btn-filter-line-su"
                 onClick={() => setFilters((f) => ({ ...f, type: 'SUINO' }))}
                 className={`px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 ${
                   filters.type === 'SUINO'
@@ -590,15 +592,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : 'text-slate-700 hover:text-emerald-800'
                 }`}
               >
-                <Beef className="w-3.5 h-3.5" />
-                Desossa Suína (DS)
-                {countDsInPeriod > 0 && (
+                <Ham className="w-3.5 h-3.5" />
+                Desossa Suína (SU)
+                {countSuInPeriod > 0 && (
                   <span
                     className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
                       filters.type === 'SUINO' ? 'bg-emerald-950 text-white' : 'bg-emerald-100 text-emerald-900'
                     }`}
                   >
-                    {countDsInPeriod} lote(s)
+                    {countSuInPeriod} lote(s)
                   </span>
                 )}
               </button>
@@ -606,7 +608,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Quick Line Overview / Parallel Warning */}
-          {((countDtInPeriod > 0 ? 1 : 0) + (countTrInPeriod > 0 ? 1 : 0) + (countCtInPeriod > 0 ? 1 : 0) + (countDsInPeriod > 0 ? 1 : 0)) > 1 && filters.viewMode === 'daily' ? (
+          {((countDtInPeriod > 0 ? 1 : 0) + (countTrInPeriod > 0 ? 1 : 0) + (countCtInPeriod > 0 ? 1 : 0) + (countSuInPeriod > 0 ? 1 : 0)) > 1 && filters.viewMode === 'daily' ? (
             <div className="flex items-center gap-2 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1.5 rounded-lg">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>
@@ -615,7 +617,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   countDtInPeriod > 0 ? `DT (${formatKg(kgDtInPeriod)})` : null,
                   countTrInPeriod > 0 ? `TR (${formatKg(kgTrInPeriod)})` : null,
                   countCtInPeriod > 0 ? `CT (${formatKg(kgCtInPeriod)})` : null,
-                  countDsInPeriod > 0 ? `DS (${formatKg(kgDsInPeriod)})` : null,
+                  countSuInPeriod > 0 ? `SU (${formatKg(kgSuInPeriod)})` : null,
                 ].filter(Boolean).join(' • ')}{' '}
                 operando paralelamente.
               </span>
@@ -626,7 +628,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {filters.type === 'TRASEIRO' && 'Exibindo indicadores exclusivos da esteira de Traseiro (Picanha, Mignon, Alcatra, etc.).'}
               {filters.type === 'COSTELA' && 'Exibindo indicadores exclusivos da esteira de Costela (Minga, Ripa, Matambre, etc.).'}
               {filters.type === 'SUINO' && 'Exibindo indicadores exclusivos da esteira de Suíno (Pernil, Paleta, Lombo, Costelinha, etc.).'}
-              {filters.type === 'ALL' && 'Exibindo soma das linhas operadas no período selecionado (DT + TR + CT + DS).'}
+              {filters.type === 'ALL' && 'Exibindo soma das linhas bovinas no período selecionado (DT + TR + CT).'}
             </div>
           )}
         </div>
@@ -1082,7 +1084,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="p-3.5 rounded-lg bg-rose-50/60 border border-rose-200/70">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
-                  <Beef className="w-4 h-4 text-rose-700" />
+                  <Crown className="w-4 h-4 text-rose-700" />
                   Traseiro (TR)
                 </span>
                 <span className="text-[10px] bg-rose-200 text-rose-900 px-1.5 py-0.5 rounded font-bold uppercase">
@@ -1115,7 +1117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="p-3.5 rounded-lg bg-orange-50/60 border border-orange-200/70">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-orange-950 flex items-center gap-1.5">
-                  <Beef className="w-4 h-4 text-orange-700" />
+                  <Bone className="w-4 h-4 text-orange-700" />
                   Costela (CT)
                 </span>
                 <span className="text-[10px] bg-orange-200 text-orange-900 px-1.5 py-0.5 rounded font-bold uppercase">
@@ -1148,8 +1150,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="p-3.5 rounded-lg bg-emerald-50/60 border border-emerald-200/70">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                  <Beef className="w-4 h-4 text-emerald-700" />
-                  Suíno (DS)
+                  <Ham className="w-4 h-4 text-emerald-700" />
+                  Suíno (SU)
                 </span>
                 <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-bold uppercase">
                   Carcaça
@@ -1158,21 +1160,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="mt-2 space-y-1.5 text-xs text-slate-700">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Rend. Desossa:</span>
-                  <span className="font-bold text-slate-900">{formatPct(dsSummary.avgDeboningYieldNetPct, 2)}</span>
+                  <span className="font-bold text-slate-900">{formatPct(suSummary.avgDeboningYieldNetPct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Quebra Média:</span>
-                  <span className={`font-semibold ${dsSummary.avgLossPct <= TARGET_LOSS_MAX ? 'text-emerald-700' : 'text-amber-700'}`}>
-                    {formatPct(dsSummary.avgLossPct, 2)}
+                  <span className={`font-semibold ${suSummary.avgLossPct <= TARGET_LOSS_MAX ? 'text-emerald-700' : 'text-amber-700'}`}>
+                    {formatPct(suSummary.avgLossPct, 2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Subprodutos:</span>
-                  <span className="font-semibold text-slate-800">{formatPct(dsSummary.avgNonSaleablePct, 2)}</span>
+                  <span className="font-semibold text-slate-800">{formatPct(suSummary.avgNonSaleablePct, 2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Margem Oper.:</span>
-                  <span className={`font-bold ${dsSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(dsSummary.avgProfitMarginPct, 2)}</span>
+                  <span className={`font-bold ${suSummary.avgProfitMarginPct >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>{formatPct(suSummary.avgProfitMarginPct, 2)}</span>
                 </div>
               </div>
             </div>
@@ -1330,10 +1332,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             ? 'bg-amber-100 text-amber-900 border-amber-200'
                             : r.type === 'SUINO'
                             ? 'bg-emerald-100 text-emerald-900 border-emerald-200'
+                            : r.type === 'COSTELA'
+                            ? 'bg-orange-100 text-orange-900 border-orange-200'
                             : 'bg-rose-100 text-rose-900 border-rose-200'
                         }`}
                       >
-                        {r.type === 'DIANTEIRO' ? 'DT - DIANTEIRO' : r.type === 'SUINO' ? 'DS - SUÍNO' : 'TR - TRASEIRO'}
+                        {r.type === 'DIANTEIRO'
+                          ? 'DT - DIANTEIRO'
+                          : r.type === 'SUINO'
+                          ? 'SU - SUÍNO'
+                          : r.type === 'COSTELA'
+                          ? 'CT - COSTELA'
+                          : 'TR - TRASEIRO'}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-slate-800 font-medium">

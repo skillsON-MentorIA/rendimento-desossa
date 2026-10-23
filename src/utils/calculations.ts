@@ -34,6 +34,77 @@ export interface CalculatedSummary {
   avgProfitMarginPct: number; // %
 }
 
+/**
+ * Consolidação Efetiva da Equipe Diária de Produção (Regra Operacional da Fábrica):
+ * - A fábrica possui estritamente 2 linhas físicas de desossa (máximo de 2 linhas simultâneas).
+ * - Uma linha é normalmente liderada pelo PEU e a outra linha pelo VINICIUS.
+ * - Em dias com 3, 4 ou mais desossas na mesma data, a mesma linha finaliza um tipo de carne
+ *   e inicia outro tipo (turnover de matéria-prima na mesma esteira).
+ * - Logo, os trabalhadores daquela linha NÃO devem ser somados novamente em duplicidade.
+ * - Consolida pelo nome do Líder (PEU vs VINICIUS vs outros) tomando o MÁXIMO de pessoas por linha.
+ * - Se houver mais de 2 linhas/líderes apontados na mesma data, toma a soma das 2 maiores linhas.
+ */
+export function calculateEffectiveDailyWorkforce(dayRecords: ProductionRecord[]): number {
+  if (!dayRecords || dayRecords.length === 0) return 0;
+
+  if (dayRecords.length === 1) {
+    return dayRecords[0].operatorCount || 20;
+  }
+
+  const lineWorkforce: Record<string, number> = {};
+
+  dayRecords.forEach((r, idx) => {
+    const leaderUpper = (r.responsibleOperator || '').toUpperCase();
+    const count = r.operatorCount > 0 ? r.operatorCount : 20;
+
+    let lineKey: string;
+    if (leaderUpper.includes('PEU')) {
+      lineKey = 'LINHA_PEU';
+    } else if (leaderUpper.includes('VINICIUS') || leaderUpper.includes('VINÍCIUS')) {
+      lineKey = 'LINHA_VINICIUS';
+    } else if (leaderUpper.trim()) {
+      lineKey = `LIDER_${leaderUpper.trim()}`;
+    } else {
+      lineKey = `LINHA_${(idx % 2) + 1}`;
+    }
+
+    lineWorkforce[lineKey] = Math.max(lineWorkforce[lineKey] || 0, count);
+  });
+
+  const lineCounts = Object.values(lineWorkforce);
+
+  // A fábrica possui no máximo 2 linhas físicas de produção
+  if (lineCounts.length <= 2) {
+    return lineCounts.reduce((a, b) => a + b, 0);
+  }
+
+  // Se mais de 2 grupos foram criados no mesmo dia, soma as 2 maiores linhas
+  lineCounts.sort((a, b) => b - a);
+  return lineCounts[0] + lineCounts[1];
+}
+
+/**
+ * Consolidação do efetivo total (pessoas-dia) em um conjunto de registros (diário ou acumulado por período).
+ */
+export function calculateEffectiveTotalWorkforce(records: ProductionRecord[]): number {
+  if (!records || records.length === 0) return 0;
+
+  // Agrupar por data
+  const byDate: Record<string, ProductionRecord[]> = {};
+  for (const r of records) {
+    const d = r.date || 'unknown';
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(r);
+  }
+
+  let totalPersonDays = 0;
+  for (const date in byDate) {
+    totalPersonDays += calculateEffectiveDailyWorkforce(byDate[date]);
+  }
+
+  return totalPersonDays;
+}
+
 export function calculateSummary(records: ProductionRecord[]): CalculatedSummary {
   if (!records || records.length === 0) {
     return {
@@ -85,7 +156,10 @@ export function calculateSummary(records: ProductionRecord[]): CalculatedSummary
     return acc + (cutsSum > 0 ? cutsSum : r.finishedProductTotalValue);
   }, 0);
   const totalGrossProfitValue = totalFinishedValue - totalCarcassCostValue;
-  const totalOperatorCount = records.reduce((acc, r) => acc + r.operatorCount, 0);
+
+  // Cálculo consolidado de operadores respeitando o limite físico de 2 linhas da fábrica
+  // e agrupando por líderes (Peu e Vinicius) para evitar duplicidades
+  const totalOperatorCount = calculateEffectiveTotalWorkforce(records);
 
   const avgLossPct = totalRawMaterialKg > 0 ? (totalLossKg / totalRawMaterialKg) * 100 : 0;
   const avgTotalYieldPct = totalRawMaterialKg > 0 ? (totalFinishedProductKg / totalRawMaterialKg) * 100 : 0;

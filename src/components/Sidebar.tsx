@@ -2,6 +2,9 @@ import React from 'react';
 import {
   LayoutDashboard,
   Beef,
+  Crown,
+  Bone,
+  Ham,
   UploadCloud,
   FileSpreadsheet,
   Layers,
@@ -56,22 +59,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'traseiro',
       label: 'Desossa Traseiro (TR)',
-      icon: Beef,
+      icon: Crown,
       badge: 'TR',
       desc: 'Picanha, Contra-filé, Alcatra',
     },
     {
       id: 'costela',
       label: 'Desossa Costela (CT)',
-      icon: Beef,
+      icon: Bone,
       badge: 'CT',
       desc: 'Minga, Ripa, Matambre, Ponta',
     },
     {
       id: 'suino',
-      label: 'Desossa Suíno (DS)',
-      icon: Beef,
-      badge: 'DS',
+      label: 'Desossa Suíno (SU)',
+      icon: Ham,
+      badge: 'SU',
       desc: 'Pernil, Paleta, Lombo, Costela',
     },
     {

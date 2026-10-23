@@ -9,6 +9,9 @@ import {
   Users,
   DollarSign,
   Beef,
+  Crown,
+  Ham,
+  Bone,
   Scale,
   Sparkles,
   ShieldAlert,
@@ -320,7 +323,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
               >
                 <div>
                   <div className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
-                    <Beef className="w-4 h-4 text-rose-700" />
+                    <Crown className="w-4 h-4 text-rose-700" />
                     Traseiro - TR (28/08)
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
@@ -339,7 +342,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
               >
                 <div>
                   <div className="text-xs font-bold text-orange-950 flex items-center gap-1.5">
-                    <Beef className="w-4 h-4 text-orange-700" />
+                    <Bone className="w-4 h-4 text-orange-700" />
                     Costela - CT (29/08)
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
@@ -358,8 +361,8 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
               >
                 <div>
                   <div className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                    <Beef className="w-4 h-4 text-emerald-700" />
-                    Suíno - DS (27/08)
+                    <Ham className="w-4 h-4 text-emerald-700" />
+                    Suíno - SU (27/08)
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
                     12.850 kg MP • 12.659 kg PA
@@ -458,7 +461,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
                     <option value="TRASEIRO">TR - Traseiro Bovino (Peça)</option>
                     <option value="DIANTEIRO">DT - Dianteiro Bovino (Peça)</option>
                     <option value="COSTELA">CT - Costela Bovina (Peça)</option>
-                    <option value="SUINO">DS - Desossa Suíno (Carcaça)</option>
+                    <option value="SUINO">SU - Desossa Suíno (Carcaça)</option>
                   </select>
                 </div>
 

@@ -7,6 +7,9 @@ import {
   ArrowUpRight,
   TrendingUp,
   Beef,
+  Crown,
+  Ham,
+  Bone,
   CheckCircle2,
   FileText,
   Filter,
@@ -499,20 +502,8 @@ export const OnePageReportCortes: React.FC<OnePageReportCortesProps> = ({
                   : 'text-slate-700 hover:text-rose-900'
               }`}
             >
-              <Beef className="w-3.5 h-3.5" />
+              <Crown className="w-3.5 h-3.5" />
               TR
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFilterTypeChange('SUINO')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
-                reportTypeFilter === 'SUINO'
-                  ? 'bg-emerald-700 text-white shadow-xs font-bold'
-                  : 'text-slate-700 hover:text-emerald-900'
-              }`}
-            >
-              <Beef className="w-3.5 h-3.5" />
-              DS
             </button>
             <button
               type="button"
@@ -523,8 +514,20 @@ export const OnePageReportCortes: React.FC<OnePageReportCortesProps> = ({
                   : 'text-slate-700 hover:text-orange-900'
               }`}
             >
-              <Beef className="w-3.5 h-3.5" />
+              <Bone className="w-3.5 h-3.5" />
               CT
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFilterTypeChange('SUINO')}
+              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                reportTypeFilter === 'SUINO'
+                  ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                  : 'text-slate-700 hover:text-emerald-900'
+              }`}
+            >
+              <Ham className="w-3.5 h-3.5" />
+              SU
             </button>
           </div>
 
@@ -538,7 +541,7 @@ export const OnePageReportCortes: React.FC<OnePageReportCortesProps> = ({
             >
               {availableRecords.map((r) => (
                 <option key={r.id} value={r.id}>
-                  {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : r.type === 'SUINO' ? 'DS' : r.type === 'COSTELA' ? 'CT' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
+                  {r.date.split('-').reverse().join('/')} - {r.type === 'DIANTEIRO' ? 'DT' : r.type === 'SUINO' ? 'SU' : r.type === 'COSTELA' ? 'CT' : 'TR'} ({r.shift} • {formatKg(r.rawMaterialWeightKg, 0)})
                 </option>
               ))}
             </select>
@@ -662,11 +665,14 @@ export const OnePageReportCortes: React.FC<OnePageReportCortesProps> = ({
                     ? 'bg-orange-100 text-orange-900 border-orange-300'
                     : 'bg-blue-100 text-blue-900 border-blue-300'
                 }`}>
-                  <Beef className="w-2.5 h-2.5" />
+                  {activeRecord.type === 'DIANTEIRO' && <Beef className="w-2.5 h-2.5" />}
+                  {activeRecord.type === 'TRASEIRO' && <Crown className="w-2.5 h-2.5" />}
+                  {activeRecord.type === 'COSTELA' && <Bone className="w-2.5 h-2.5" />}
+                  {activeRecord.type === 'SUINO' && <Ham className="w-2.5 h-2.5" />}
                   {activeRecord.type === 'DIANTEIRO'
                     ? 'Dianteiro (DT)'
                     : activeRecord.type === 'SUINO'
-                    ? 'Suíno (DS)'
+                    ? 'Suíno (SU)'
                     : activeRecord.type === 'COSTELA'
                     ? 'Costela (CT)'
                     : 'Traseiro (TR)'}

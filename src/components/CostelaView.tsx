@@ -172,8 +172,8 @@ export const CostelaView: React.FC = () => {
       <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-amber-900/10 border border-amber-300 flex items-center justify-center text-amber-900">
-              <Beef className="w-7 h-7" />
+            <div className="w-12 h-12 rounded-xl bg-orange-900/10 border border-orange-300 flex items-center justify-center text-orange-900">
+              <Bone className="w-7 h-7 text-orange-700" />
             </div>
             <div>
               <div className="flex items-center gap-2">
