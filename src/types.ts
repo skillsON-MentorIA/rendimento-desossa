@@ -47,7 +47,7 @@ export interface ProductionRecord {
   companyName: string;
   emissionTime: string;
   type: CutType; // DT or TR
-  shift: 'Turno 1' | 'Turno 2' | 'Turno 3' | string;
+  shift: 'Turno 1' | 'Turno 2' | 'Turno 3';
   responsibleOperator: string;
   operatorCount: number;
   

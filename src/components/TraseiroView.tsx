@@ -264,12 +264,9 @@ export const TraseiroView: React.FC = () => {
               {formatPct(avgLossPct, 3)}
             </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">
               Quebra: <strong className="text-slate-700 font-bold">{formatKg(totalLoss, 0)}</strong>
-            </span>
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${avgLossPct <= 0.8 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-              {avgLossPct <= 0.8 ? 'No Limite' : 'Acima Teto'}
             </span>
           </div>
         </div>

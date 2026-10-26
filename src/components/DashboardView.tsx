@@ -764,23 +764,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {formatPct(summary.avgLossPct, 3)}
             </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">
               Quebra: <strong className="text-slate-700 font-bold">{formatKg(summary.totalLossKg, 0)}</strong>
-            </span>
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${
-                summary.avgLossPct <= TARGET_LOSS_MAX
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-rose-50 text-rose-700'
-              }`}
-            >
-              {summary.avgLossPct <= TARGET_LOSS_MAX ? 'No Limite' : 'Acima Teto'}
             </span>
           </div>
         </div>
 
-        {/* e) 5. Faturamento PA */}
+        {/* e) 5. Faturamento PA (Custo de Matéria-Prima excluído conforme solicitação) */}
         <div id="kpi-box-faturamento-pa" className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full min-h-[156px]">
           <div className="flex items-center justify-between text-slate-500 mb-2 h-7">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Faturamento Total do Produto Acabado">
@@ -795,13 +786,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {formatCurrency(summary.totalFinishedValue)}
             </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
-            <span className="text-slate-500 text-[11px] whitespace-nowrap">Custo Matéria-Prima:</span>
-            <span className="font-bold text-slate-700 text-xs whitespace-nowrap">{formatCurrency(summary.totalCarcassCostValue)}</span>
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center text-xs min-h-[34px]">
+            <span className="text-slate-500 text-[11px] whitespace-nowrap">Receita Total Realizada</span>
           </div>
         </div>
 
-        {/* f) 6. Produtividade (Linha de Desossa como um todo) */}
+        {/* f) 6. Produtividade (Tag Operacional excluída conforme solicitação) */}
         <div id="kpi-box-produtividade" className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between h-full min-h-[156px]">
           <div className="flex items-center justify-between text-slate-500 mb-2 h-7">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500 truncate" title="Produtividade da Linha de Desossa (kg por operador)">
@@ -819,12 +809,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-xs font-semibold text-slate-500">kg/pes</span>
             </div>
           </div>
-          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs min-h-[34px]">
+          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center text-xs min-h-[34px]">
             <span className="text-slate-500 text-[11px] whitespace-nowrap">
               Efetivo Total: <strong className="text-slate-700 font-bold">{summary.totalOperatorCount} pessoas</strong>
-            </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 shrink-0 whitespace-nowrap">
-              Operacional
             </span>
           </div>
         </div>

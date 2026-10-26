@@ -7,6 +7,7 @@ import {
 } from '../data/initialData';
 import { CutItem, CutType, FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
 import { CalculatedSummary, calculateSummary, cleanRawMaterialName } from '../utils/calculations';
+import { encryptPassword, decryptPassword, verifyPassword } from '../utils/securityCrypto';
 import {
   syncRecordsToSupabase,
   fetchRecordsFromSupabase,
@@ -296,19 +297,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = parsed.filter(
-            (u: User) =>
-              !u.name.includes('Roberto') &&
-              !u.name.includes('Carlos') &&
-              !u.name.includes('Arthur')
-          );
+          const sanitized = parsed
+            .filter(
+              (u: User) =>
+                !u.name.includes('Roberto') &&
+                !u.name.includes('Carlos') &&
+                !u.name.includes('Arthur')
+            )
+            .map((u: User) => ({
+              ...u,
+              password: encryptPassword(u.password || 'admin123'),
+            }));
           if (sanitized.length > 0) return sanitized;
         }
       } catch (e) {
         console.error(e);
       }
     }
-    return INITIAL_USERS;
+    return INITIAL_USERS.map((u) => ({
+      ...u,
+      password: encryptPassword(u.password || 'admin123'),
+    }));
   });
 
   // Current authenticated user
@@ -466,6 +475,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...userData,
       id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       username: cleanUsername,
+      password: encryptPassword(userData.password || 'admin123'),
     };
 
     setUsers((prev) => [...prev, newUser]);
@@ -478,17 +488,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = (userId: string, updates: Partial<User>) => {
+    const finalUpdates = { ...updates };
+    if (finalUpdates.password) {
+      finalUpdates.password = encryptPassword(finalUpdates.password);
+    }
+
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, ...updates } : u))
+      prev.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u))
     );
     if (currentUser?.id === userId) {
-      setCurrentUser((prev) => (prev ? { ...prev, ...updates } : null));
+      setCurrentUser((prev) => (prev ? { ...prev, ...finalUpdates } : null));
     }
   };
 
   const login = (username: string, password?: string): { success: boolean; message?: string } => {
     const cleanUser = username.trim().toLowerCase();
-    const cleanPass = password?.trim();
+    const cleanPass = password?.trim() || '';
 
     const user = users.find(
       (u) => u.username.toLowerCase() === cleanUser || u.email?.toLowerCase() === cleanUser
@@ -501,7 +516,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    if (user.password && cleanPass !== user.password) {
+    if (user.password && !verifyPassword(cleanPass, user.password)) {
       return {
         success: false,
         message: 'Senha incorreta para este usuário.',

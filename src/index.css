@@ -24,23 +24,31 @@
     border-radius: 0px !important;
     width: 100% !important;
     max-width: 100% !important;
-    height: 100% !important;
-    max-height: 288mm !important;
+    height: auto !important;
+    min-height: auto !important;
     margin: 0 auto !important;
-    padding: 2.5mm 3.5mm !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-    page-break-before: avoid !important;
-    break-before: avoid !important;
-    overflow: hidden !important;
+    padding: 3mm 4mm !important;
+    page-break-after: auto !important;
+    break-after: auto !important;
+    page-break-before: auto !important;
+    break-before: auto !important;
+    overflow: visible !important;
     box-sizing: border-box !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
   }
-  table, tr, td, th, tbody, thead, tfoot {
+  table {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  tr {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+  thead {
+    display: table-header-group !important;
+  }
+  tfoot {
+    display: table-row-group !important;
   }
 }

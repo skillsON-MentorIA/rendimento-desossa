@@ -31,6 +31,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { User, UserRole, ProductionRecord } from '../types';
 import { formatCurrency, formatPct } from '../utils/calculations';
+import { decryptPassword, encryptPassword, isPasswordEncrypted } from '../utils/securityCrypto';
 import {
   getSupabaseConfig,
   saveCustomSupabaseConfig,
@@ -558,8 +559,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Senha de Acesso: *
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Senha de Acesso: *</span>
+                      <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-emerald-600" />
+                        Criptografia AES-256
+                      </span>
                     </label>
                     <div className="relative">
                       <input
@@ -696,7 +701,15 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                   <tr>
                     <th className="py-3 px-4">Usuário</th>
                     <th className="py-3 px-4">Login / E-mail</th>
-                    <th className="py-3 px-4">Senha de Acesso</th>
+                    <th className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <span>Senha de Acesso</span>
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300 normal-case" title="Criptografia AES-256 ativa">
+                          <Lock className="w-2.5 h-2.5 text-emerald-700" />
+                          AES-256
+                        </span>
+                      </div>
+                    </th>
                     <th className="py-3 px-4">Perfil de Acesso</th>
                     <th className="py-3 px-4">Permissões Permitidas</th>
                     <th className="py-3 px-4 text-center">Ações</th>
@@ -706,7 +719,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                   {users.map((u) => {
                     const isSelf = u.id === currentUser?.id;
                     const isPwdRevealed = !!revealedPasswords[u.id];
-                    const userPwd = u.password || 'admin123';
+                    const decryptedPwd = decryptPassword(u.password) || 'admin123';
 
                     return (
                       <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
@@ -733,13 +746,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1.5">
-                            <div className="font-mono text-xs font-semibold px-2 py-1 rounded bg-slate-50 border border-slate-200 min-w-[95px] flex items-center justify-between text-slate-800">
+                            <div className="font-mono text-xs font-semibold px-2 py-1 rounded bg-slate-50 border border-slate-200 min-w-[95px] flex items-center justify-between text-slate-800" title="Criptografada em AES-256">
                               {isPwdRevealed ? (
                                 <span className="text-purple-950 font-bold tracking-tight select-all">
-                                  {userPwd}
+                                  {decryptedPwd}
                                 </span>
                               ) : (
-                                <span className="text-slate-400 tracking-widest text-[13px] select-none">
+                                <span className="text-slate-400 tracking-widest text-[13px] select-none" title="Criptografada em AES-256">
                                   ••••••••
                                 </span>
                               )}
@@ -748,7 +761,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                               type="button"
                               onClick={() => togglePasswordVisibility(u.id)}
                               className="p-1 text-slate-500 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
-                              title={isPwdRevealed ? 'Ocultar senha' : 'Ver senha configurada'}
+                              title={isPwdRevealed ? 'Ocultar senha' : 'Descriptografar e ver senha configurada'}
                             >
                               {isPwdRevealed ? (
                                 <EyeOff className="w-4 h-4 text-purple-700" />
@@ -759,7 +772,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                             {isPwdRevealed && (
                               <button
                                 type="button"
-                                onClick={() => handleCopyPassword(userPwd, u.name)}
+                                onClick={() => handleCopyPassword(decryptedPwd, u.name)}
                                 className="p-1 text-slate-400 hover:text-purple-700 hover:bg-purple-50 rounded-md transition-colors cursor-pointer"
                                 title="Copiar senha para área de transferência"
                               >
@@ -856,16 +869,22 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
 
                 {/* Senha Atual do Usuário */}
                 <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl text-xs space-y-1">
-                  <span className="text-[11px] font-bold text-purple-900 block">
-                    Senha Atual Configurada:
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-900 block">
+                      Senha Atual Configurada:
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-300">
+                      <Lock className="w-2.5 h-2.5 text-emerald-700" />
+                      AES-256
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between gap-2 pt-0.5">
                     <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded border border-purple-200 select-all flex-1">
-                      {editingUser.password || 'admin123'}
+                      {decryptPassword(editingUser.password) || 'admin123'}
                     </span>
                     <button
                       type="button"
-                      onClick={() => handleCopyPassword(editingUser.password || 'admin123', editingUser.name)}
+                      onClick={() => handleCopyPassword(decryptPassword(editingUser.password) || 'admin123', editingUser.name)}
                       className="px-2 py-1 text-[11px] font-semibold text-purple-700 bg-white hover:bg-purple-100 rounded border border-purple-200 flex items-center gap-1 cursor-pointer transition-colors"
                       title="Copiar senha atual"
                     >
@@ -877,8 +896,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
 
                 <form onSubmit={handleChangePassword} className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      Definir Nova Senha:
+                    <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Definir Nova Senha:</span>
+                      <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-emerald-600" />
+                        Será criptografada em AES-256
+                      </span>
                     </label>
                     <div className="relative">
                       <input
