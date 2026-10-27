@@ -345,12 +345,31 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
         profit_margin_pct: num(r.profitMarginPct),
         notes: r.notes || '',
         cuts: cutsArray,
-        updated_at: new Date().toISOString(),
       };
     });
 
     const { error } = await client.from('production_records').upsert(rows, { onConflict: 'id' });
     if (error) {
+      // Check if error is due to check constraint production_records_type_check (e.g. only DT and TR allowed in existing table)
+      if (
+        error.message?.includes('production_records_type_check') ||
+        (error.details && error.details.includes('production_records_type_check'))
+      ) {
+        console.warn('Detectada restrição production_records_type_check no Supabase. Tentando sincronizar lotes bovinos compatíveis...');
+        const compatibleRows = rows.filter((r) => r.type === 'DIANTEIRO' || r.type === 'TRASEIRO');
+        const incompatibleCount = rows.length - compatibleRows.length;
+
+        if (compatibleRows.length > 0) {
+          const { error: retryErr } = await client.from('production_records').upsert(compatibleRows, { onConflict: 'id' });
+          if (!retryErr) {
+            return {
+              success: true,
+              message: `⚠️ ${compatibleRows.length} lotes bovinos (DT/TR) gravados no Supabase! Para gravar os outros ${incompatibleCount} lotes (Suíno/Costela), execute no SQL Editor do Supabase: ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;`,
+              count: compatibleRows.length,
+            };
+          }
+        }
+      }
       throw error;
     }
 
@@ -625,7 +644,6 @@ export async function syncUsersToSupabase(users: User[]): Promise<{ success: boo
         email: u.email?.trim() || `${cleanUsername}@frigorifico.com.br`,
         password: u.password || 'admin123',
         role: u.role,
-        updated_at: new Date().toISOString(),
       };
     });
 
@@ -700,6 +718,13 @@ export function getSupabaseSetupSQL(): string {
 -- SCRIPT DE CRIAÇÃO E ATUALIZAÇÃO DO BANCO NO SUPABASE
 -- Execute este script no SQL Editor do seu projeto Supabase:
 -- ========================================================
+
+-- 0. AJUSTE DE RESTRIÇÕES E COLUNAS (Libera lotes de Suíno, Costela e alinha usuários)
+ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;
+ALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check 
+    CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));
+
+ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- 1. Tabela de Lotes e Desempenho da Desossa (com tipos numéricos flexíveis para evitar estouro de precisão)
 CREATE TABLE IF NOT EXISTS public.production_records (

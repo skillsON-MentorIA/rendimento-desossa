@@ -113,6 +113,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
   const [copiedRlsSql, setCopiedRlsSql] = useState<boolean>(false);
+  const [copiedTypeFixSql, setCopiedTypeFixSql] = useState<boolean>(false);
 
   // Parameters state
   const [dtCost, setDtCost] = useState<number>(15.20);
@@ -1173,6 +1174,45 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                 )}
               </div>
             )}
+
+            {/* Card de Correção Rápida de Esquema / Restrições */}
+            <div className="p-4 bg-sky-50 border border-sky-200 rounded-xl text-xs space-y-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 text-sky-950">
+                  <Database className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-xs text-sky-950 block font-bold">
+                      Ajuste de Restrições no Supabase (Liberar Suíno e Costela)
+                    </strong>
+                    <p className="mt-0.5 text-[11px] text-slate-700 leading-relaxed">
+                      Para autorizar lotes de <strong>Suíno</strong> e <strong>Costela</strong> no banco da nuvem e compatibilizar a tabela de usuários, execute este comando no <strong>SQL Editor</strong> do Supabase:
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fixSql = `ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;\nALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));\nALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();`;
+                    navigator.clipboard.writeText(fixSql);
+                    setCopiedTypeFixSql(true);
+                    setTimeout(() => setCopiedTypeFixSql(false), 3000);
+                    showFeedback('Comando SQL de correção copiado!', 'success');
+                  }}
+                  className="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 text-white rounded-lg font-bold text-[11px] shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  {copiedTypeFixSql ? 'Copiado!' : 'Copiar Correção SQL'}
+                </button>
+              </div>
+
+              <div className="bg-slate-900 text-emerald-400 p-2.5 rounded-lg font-mono text-[10.5px] overflow-x-auto leading-relaxed">
+                <code>
+                  ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;<br/>
+                  ALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));<br/>
+                  ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+                </code>
+              </div>
+            </div>
 
             {/* Manual Credential Configuration Form */}
             <form onSubmit={handleSaveSupabaseConfig} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
