@@ -139,7 +139,7 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
   if (!client) {
     return {
       success: false,
-      message: 'Supabase não configurado.',
+      message: 'Supabase não configurado. Insira a URL e Anon Key no Netlify ou no menu Administrador.',
     };
   }
 
@@ -150,48 +150,75 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
     };
   }
 
+  const num = (v: any, fallback = 0): number => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : fallback;
+    if (typeof v === 'string') {
+      const parsed = parseFloat(v.replace(',', '.'));
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+    return fallback;
+  };
+
+  const toIsoDate = (d?: string): string => {
+    if (!d) return new Date().toISOString().split('T')[0];
+    const s = d.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const brMatch = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+    return new Date().toISOString().split('T')[0];
+  };
+
   try {
-    // Map application objects to DB format
-    const rows = records.map((r) => ({
-      id: r.id,
-      date: r.date,
-      period_start: r.periodStart,
-      period_end: r.periodEnd,
-      company_name: r.companyName,
-      emission_time: r.emissionTime,
-      type: r.type,
-      shift: r.shift,
-      responsible_operator: r.responsibleOperator,
-      operator_count: r.operatorCount,
-      raw_material_code: r.rawMaterialCode,
-      raw_material_desc: r.rawMaterialDesc,
-      raw_material_weight_kg: r.rawMaterialWeightKg,
-      raw_material_boxes: r.rawMaterialBoxes,
-      raw_material_avg_weight_kg: r.rawMaterialAvgWeightKg,
-      carcass_cost_per_kg: r.carcassCostPerKg,
-      total_carcass_cost: r.totalCarcassCost,
-      finished_product_weight_kg: r.finishedProductWeightKg,
-      finished_product_boxes: r.finishedProductBoxes,
-      finished_product_total_value: r.finishedProductTotalValue,
-      loss_kg: r.lossKg,
-      loss_pct: r.lossPct,
-      saleable_cuts_weight_kg: r.saleableCutsWeightKg,
-      saleable_cuts_boxes: r.cuts.filter((c) => !c.isNonSaleable).reduce((acc, c) => acc + (c.boxesCount || 0), 0),
-      bone_weight_kg: r.boneWeightKg,
-      bone_pct: r.bonePct,
-      fat_weight_kg: r.fatWeightKg,
-      fat_pct: r.fatPct,
-      non_saleable_weight_kg: r.nonSaleableWeightKg,
-      non_saleable_pct: r.nonSaleablePct,
-      deboning_yield_net_pct: r.deboningYieldNetPct,
-      total_yield_pct: r.totalYieldPct,
-      productivity_kg_per_person: r.productivityKgPerPerson,
-      gross_profit_value: r.grossProfitValue,
-      profit_margin_pct: r.profitMarginPct,
-      notes: r.notes,
-      cuts: r.cuts,
-      updated_at: new Date().toISOString(),
-    }));
+    // Map application objects to DB format safely
+    const rows = records.map((r) => {
+      const cutsArray = Array.isArray(r.cuts) ? r.cuts : [];
+      const saleableBoxes = cutsArray
+        .filter((c) => !c.isNonSaleable)
+        .reduce((acc, c) => acc + (num(c.boxesCount) || 0), 0);
+
+      const targetDate = toIsoDate(r.date);
+
+      return {
+        id: r.id,
+        date: targetDate,
+        period_start: r.periodStart ? toIsoDate(r.periodStart) : targetDate,
+        period_end: r.periodEnd ? toIsoDate(r.periodEnd) : targetDate,
+        company_name: r.companyName || 'Frigorífico Industrial',
+        emission_time: r.emissionTime || 'Hoje',
+        type: r.type,
+        shift: r.shift || 'Turno 1',
+        responsible_operator: r.responsibleOperator || 'Operador Padrão',
+        operator_count: Math.max(1, Math.round(num(r.operatorCount, 20))),
+        raw_material_code: r.rawMaterialCode || '',
+        raw_material_desc: r.rawMaterialDesc || '',
+        raw_material_weight_kg: num(r.rawMaterialWeightKg),
+        raw_material_boxes: Math.round(num(r.rawMaterialBoxes)),
+        raw_material_avg_weight_kg: num(r.rawMaterialAvgWeightKg),
+        carcass_cost_per_kg: num(r.carcassCostPerKg),
+        total_carcass_cost: num(r.totalCarcassCost),
+        finished_product_weight_kg: num(r.finishedProductWeightKg),
+        finished_product_boxes: Math.round(num(r.finishedProductBoxes)),
+        finished_product_total_value: num(r.finishedProductTotalValue),
+        loss_kg: num(r.lossKg),
+        loss_pct: num(r.lossPct),
+        saleable_cuts_weight_kg: num(r.saleableCutsWeightKg),
+        saleable_cuts_boxes: Math.round(saleableBoxes),
+        bone_weight_kg: num(r.boneWeightKg),
+        bone_pct: num(r.bonePct),
+        fat_weight_kg: num(r.fatWeightKg),
+        fat_pct: num(r.fatPct),
+        non_saleable_weight_kg: num(r.nonSaleableWeightKg),
+        non_saleable_pct: num(r.nonSaleablePct),
+        deboning_yield_net_pct: num(r.deboningYieldNetPct),
+        total_yield_pct: num(r.totalYieldPct),
+        productivity_kg_per_person: num(r.productivityKgPerPerson),
+        gross_profit_value: num(r.grossProfitValue),
+        profit_margin_pct: num(r.profitMarginPct),
+        notes: r.notes || '',
+        cuts: cutsArray,
+        updated_at: new Date().toISOString(),
+      };
+    });
 
     const { error } = await client.from('production_records').upsert(rows, { onConflict: 'id' });
     if (error) {
@@ -204,9 +231,10 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
       count: rows.length,
     };
   } catch (err: any) {
+    console.error('Erro ao sincronizar produção no Supabase:', err);
     return {
       success: false,
-      message: `Erro ao enviar dados para o Supabase: ${err.message}`,
+      message: `Erro ao enviar lotes para o Supabase: ${err.message}`,
     };
   }
 }
@@ -399,31 +427,100 @@ export async function fetchRecordsFromSupabase(): Promise<{ success: boolean; da
 }
 
 /**
- * Syncs user accounts to Supabase app_users table
+ * Deletes a single user from Supabase app_users table.
  */
-export async function syncUsersToSupabase(users: User[]): Promise<{ success: boolean; message: string }> {
+export async function deleteUserFromSupabase(userId: string, username?: string): Promise<{ success: boolean; message: string }> {
   const client = getSupabaseClient();
   if (!client) {
     return { success: false, message: 'Supabase não configurado.' };
   }
 
   try {
-    const rows = users.map((u) => ({
-      id: u.id,
-      name: u.name,
-      username: u.username.toLowerCase().trim(),
-      email: u.email,
-      password: u.password || 'admin123',
-      role: u.role,
-      updated_at: new Date().toISOString(),
-    }));
-
-    const { error } = await client.from('app_users').upsert(rows, { onConflict: 'id' });
+    let query = client.from('app_users').delete();
+    if (userId) {
+      query = query.eq('id', userId);
+    } else if (username) {
+      query = query.eq('username', username.toLowerCase().trim());
+    }
+    const { error } = await query;
     if (error) throw error;
 
-    return { success: true, message: `${users.length} usuários sincronizados no Supabase.` };
+    return { success: true, message: 'Usuário excluído com sucesso do Supabase.' };
   } catch (err: any) {
-    return { success: false, message: `Erro ao sincronizar usuários no Supabase: ${err.message}` };
+    console.error('Erro ao excluir usuário no Supabase:', err);
+    return { success: false, message: `Erro ao excluir usuário no Supabase: ${err.message}` };
+  }
+}
+
+/**
+ * Syncs user accounts to Supabase app_users table safely.
+ * Matches existing usernames to their DB primary keys so onConflict doesn't fail on unique username collisions.
+ */
+export async function syncUsersToSupabase(users: User[]): Promise<{ success: boolean; message: string; count?: number }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase não configurado. Verifique a URL e a Anon Key no menu Administrador.' };
+  }
+
+  if (!users || users.length === 0) {
+    return { success: false, message: 'Nenhum usuário local para sincronizar.' };
+  }
+
+  try {
+    // 1. Fetch remote users to identify matching usernames and reuse their DB IDs
+    const { data: remoteUsers, error: fetchErr } = await client
+      .from('app_users')
+      .select('id, username');
+
+    if (fetchErr) {
+      console.warn('Aviso ao consultar app_users existentes no Supabase:', fetchErr.message);
+    }
+
+    const remoteUsernameMap = new Map<string, string>(); // lowercase username -> remote id
+    if (remoteUsers && Array.isArray(remoteUsers)) {
+      remoteUsers.forEach((ru: any) => {
+        if (ru.username) {
+          remoteUsernameMap.set(ru.username.toLowerCase().trim(), ru.id);
+        }
+      });
+    }
+
+    // 2. Map users, reusing existing remote ID when username matches
+    const rows = users.map((u) => {
+      const cleanUsername = u.username.toLowerCase().trim();
+      const dbId = remoteUsernameMap.get(cleanUsername) || u.id;
+      return {
+        id: dbId,
+        name: u.name.trim(),
+        username: cleanUsername,
+        email: u.email?.trim() || `${cleanUsername}@frigorifico.com.br`,
+        password: u.password || 'admin123',
+        role: u.role,
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    // 3. Upsert using primary key 'id'
+    const { error: upsertErr } = await client.from('app_users').upsert(rows, { onConflict: 'id' });
+    if (upsertErr) {
+      // Fallback: try onConflict on 'username'
+      const { error: retryErr } = await client.from('app_users').upsert(rows, { onConflict: 'username' });
+      if (retryErr) {
+        throw new Error(upsertErr.message || retryErr.message);
+      }
+    }
+
+    return {
+      success: true,
+      message: `${rows.length} usuário(s) sincronizado(s) com sucesso no Supabase!`,
+      count: rows.length,
+    };
+  } catch (err: any) {
+    console.error('Erro ao sincronizar usuários no Supabase:', err);
+    return {
+      success: false,
+      message: `Erro ao sincronizar usuários no Supabase: ${err.message}`,
+    };
   }
 }
 
@@ -471,11 +568,11 @@ export function downloadDatabaseSpreadsheet(records: ProductionRecord[], benchma
  */
 export function getSupabaseSetupSQL(): string {
   return `-- ========================================================
--- SCRIPT DE CRIAÇÃO DO BANCO DE DADOS DESOSSA NO SUPABASE
+-- SCRIPT DE CRIAÇÃO E ATUALIZAÇÃO DO BANCO NO SUPABASE
 -- Execute este script no SQL Editor do seu projeto Supabase:
 -- ========================================================
 
--- 1. Tabela de Lotes e Desempenho da Desossa
+-- 1. Tabela de Lotes e Desempenho da Desossa (com tipos numéricos flexíveis para evitar estouro de precisão)
 CREATE TABLE IF NOT EXISTS public.production_records (
     id TEXT PRIMARY KEY,
     date DATE NOT NULL,
@@ -483,40 +580,61 @@ CREATE TABLE IF NOT EXISTS public.production_records (
     period_end TEXT,
     company_name TEXT,
     emission_time TEXT,
-    type TEXT NOT NULL, -- 'DIANTEIRO' ou 'TRASEIRO'
+    type TEXT NOT NULL,
     shift TEXT,
     responsible_operator TEXT,
     operator_count INTEGER DEFAULT 20,
     raw_material_code TEXT,
     raw_material_desc TEXT,
-    raw_material_weight_kg NUMERIC(12,3) NOT NULL,
+    raw_material_weight_kg NUMERIC NOT NULL,
     raw_material_boxes INTEGER DEFAULT 0,
-    raw_material_avg_weight_kg NUMERIC(10,3),
-    carcass_cost_per_kg NUMERIC(10,2) NOT NULL,
-    total_carcass_cost NUMERIC(12,2) NOT NULL,
-    finished_product_weight_kg NUMERIC(12,3) NOT NULL,
+    raw_material_avg_weight_kg NUMERIC,
+    carcass_cost_per_kg NUMERIC NOT NULL,
+    total_carcass_cost NUMERIC NOT NULL,
+    finished_product_weight_kg NUMERIC NOT NULL,
     finished_product_boxes INTEGER DEFAULT 0,
-    finished_product_total_value NUMERIC(12,2) NOT NULL,
-    loss_kg NUMERIC(10,3) DEFAULT 0,
-    loss_pct NUMERIC(6,4) DEFAULT 0,
-    saleable_cuts_weight_kg NUMERIC(12,3) DEFAULT 0,
+    finished_product_total_value NUMERIC NOT NULL,
+    loss_kg NUMERIC DEFAULT 0,
+    loss_pct NUMERIC DEFAULT 0,
+    saleable_cuts_weight_kg NUMERIC DEFAULT 0,
     saleable_cuts_boxes INTEGER DEFAULT 0,
-    bone_weight_kg NUMERIC(10,3) DEFAULT 0,
-    bone_pct NUMERIC(6,3) DEFAULT 0,
-    fat_weight_kg NUMERIC(10,3) DEFAULT 0,
-    fat_pct NUMERIC(6,3) DEFAULT 0,
-    non_saleable_weight_kg NUMERIC(10,3) DEFAULT 0,
-    non_saleable_pct NUMERIC(6,3) DEFAULT 0,
-    deboning_yield_net_pct NUMERIC(6,3) DEFAULT 0,
-    total_yield_pct NUMERIC(6,3) DEFAULT 0,
-    productivity_kg_per_person NUMERIC(10,2) DEFAULT 0,
-    gross_profit_value NUMERIC(12,2) DEFAULT 0,
-    profit_margin_pct NUMERIC(6,3) DEFAULT 0,
+    bone_weight_kg NUMERIC DEFAULT 0,
+    bone_pct NUMERIC DEFAULT 0,
+    fat_weight_kg NUMERIC DEFAULT 0,
+    fat_pct NUMERIC DEFAULT 0,
+    non_saleable_weight_kg NUMERIC DEFAULT 0,
+    non_saleable_pct NUMERIC DEFAULT 0,
+    deboning_yield_net_pct NUMERIC DEFAULT 0,
+    total_yield_pct NUMERIC DEFAULT 0,
+    productivity_kg_per_person NUMERIC DEFAULT 0,
+    gross_profit_value NUMERIC DEFAULT 0,
+    profit_margin_pct NUMERIC DEFAULT 0,
     notes TEXT,
     cuts JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Garantir que tabelas pré-existentes tenham colunas sem restrição de tamanho rígida (evita numeric field overflow)
+DO $$
+BEGIN
+    ALTER TABLE public.production_records ALTER COLUMN loss_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN loss_kg TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN profit_margin_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN bone_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN fat_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN non_saleable_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN deboning_yield_net_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN total_yield_pct TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN productivity_kg_per_person TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN raw_material_weight_kg TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN finished_product_weight_kg TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN total_carcass_cost TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN finished_product_total_value TYPE NUMERIC;
+    ALTER TABLE public.production_records ALTER COLUMN gross_profit_value TYPE NUMERIC;
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
 
 -- Índices de consulta rápida
 CREATE INDEX IF NOT EXISTS idx_prod_records_date ON public.production_records(date DESC);
@@ -534,23 +652,23 @@ CREATE TABLE IF NOT EXISTS public.app_users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Inserção dos usuários padrão se ainda não existirem
+-- Inserção segura dos usuários padrão sem sobrescrever senhas existentes
 INSERT INTO public.app_users (id, name, username, email, password, role)
 VALUES 
-    ('usr_admin', 'Administrador Geral', 'admin', 'admin@frigorifico.com.br', 'admin123', 'ADMIN'),
-    ('usr_gerente', 'Gerente de Produção', 'gerente', 'gerente@frigorifico.com.br', 'gerente123', 'GERENCIAL'),
-    ('usr_diretoria', 'Diretoria Executiva', 'diretoria', 'diretoria@frigorifico.com.br', 'diretoria123', 'DIRETORIA')
-ON CONFLICT (id) DO NOTHING;
+    ('usr_admin', 'Administrador Geral', 'admin', 'admin@frigorifico.com.br', 'admin123', 'ADMIN')
+ON CONFLICT (username) DO NOTHING;
 
--- 3. Habilita RLS (Row Level Security) permitindo leitura/escrita com a chave ANON pública da aplicação
+-- 3. Habilita RLS (Row Level Security) com políticas idempotentes (pode ser executado múltiplas vezes)
 ALTER TABLE public.production_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Acesso completo produção para anon" ON public.production_records;
 CREATE POLICY "Acesso completo produção para anon" ON public.production_records
     FOR ALL
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Acesso completo usuários para anon" ON public.app_users;
 CREATE POLICY "Acesso completo usuários para anon" ON public.app_users
     FOR ALL
     USING (true)

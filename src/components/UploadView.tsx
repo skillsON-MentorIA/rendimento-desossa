@@ -182,7 +182,9 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
     processUploadedFile(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canUpload) {
       setErrorMsg('Seu perfil atual (DIRETORIA) tem permissão de apenas visualização.');
@@ -194,11 +196,29 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
       return;
     }
 
-    addRecord(parsedPreview);
-    setSuccessMsg('Lote de produção adicionado com sucesso ao sistema!');
-    setTimeout(() => {
-      onSuccessUpload(parsedPreview.id);
-    }, 1200);
+    setIsSubmitting(true);
+    setErrorMsg('');
+    setSuccessMsg('Processando e gravando lote na base de dados...');
+
+    try {
+      const result = await addRecord(parsedPreview);
+      setIsSubmitting(false);
+
+      if (result.supabaseSynced) {
+        setSuccessMsg('✅ Lote de produção adicionado e gravado no Supabase com sucesso!');
+      } else if (result.supabaseError) {
+        setSuccessMsg(`⚠️ Lote salvo localmente, mas a sincronização com o Supabase informou: ${result.supabaseError}`);
+      } else {
+        setSuccessMsg('✅ Lote de produção adicionado com sucesso ao sistema!');
+      }
+
+      setTimeout(() => {
+        onSuccessUpload(parsedPreview.id);
+      }, 1400);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMsg(`Erro ao salvar lote: ${err.message || err}`);
+    }
   };
 
   if (!canUpload) {
@@ -753,11 +773,20 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
 
               <button
                 type="submit"
-                disabled={!parsedPreview}
-                className="px-6 py-2.5 bg-rose-900 hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2"
+                disabled={!parsedPreview || isSubmitting}
+                className="px-6 py-2.5 bg-rose-900 hover:bg-rose-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Processar e Salvar Lote de Produção
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Gravando e Sincronizando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Processar e Salvar Lote de Produção
+                  </>
+                )}
               </button>
             </div>
           </form>

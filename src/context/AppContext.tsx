@@ -13,6 +13,7 @@ import {
   fetchRecordsFromSupabase,
   syncUsersToSupabase,
   fetchUsersFromSupabase,
+  deleteUserFromSupabase,
   deleteRecordFromSupabase,
   deleteAllRecordsFromSupabase,
   replaceRecordsInSupabase,
@@ -23,9 +24,9 @@ interface AppContextType {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
   users: User[];
-  addUser: (user: Omit<User, 'id'>) => void;
-  removeUser: (userId: string) => boolean;
-  updateUser: (userId: string, updates: Partial<User>) => void;
+  addUser: (user: Omit<User, 'id'>) => Promise<{ success: boolean; user: User; supabaseSync?: { success: boolean; message: string } }>;
+  removeUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
+  updateUser: (userId: string, updates: Partial<User>) => Promise<{ success: boolean; supabaseSync?: { success: boolean; message: string } }>;
   records: ProductionRecord[];
   filteredRecords: ProductionRecord[];
   summary: CalculatedSummary;
@@ -33,7 +34,7 @@ interface AppContextType {
   benchmarks: MarketBenchmark[];
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
-  addRecord: (record: ProductionRecord) => void;
+  addRecord: (record: ProductionRecord) => Promise<{ success: boolean; message: string; supabaseSynced: boolean; supabaseError?: string }>;
   deleteRecord: (id: string) => Promise<{ success: boolean; message: string }>;
   deleteAllRecords: () => Promise<{ success: boolean; message: string }>;
   updateRecord: (record: ProductionRecord) => void;
@@ -513,7 +514,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // User management methods
-  const addUser = (userData: Omit<User, 'id'>) => {
+  const addUser = async (userData: Omit<User, 'id'>): Promise<{ success: boolean; user: User; supabaseSync?: { success: boolean; message: string } }> => {
     const cleanUsername = userData.username.trim().toLowerCase();
     const exists = users.some((u) => u.username.toLowerCase() === cleanUsername);
     if (exists) {
@@ -527,47 +528,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       password: encryptPassword(userData.password || 'admin123'),
     };
 
-    setUsers((prev) => {
-      const next = [...prev, newUser];
-      const cfg = getSupabaseConfig();
-      if (cfg.isConfigured) {
-        syncUsersToSupabase(next).catch(console.error);
-      }
-      return next;
-    });
+    const nextUsers = [...users, newUser];
+    setUsers(nextUsers);
+
+    const cfg = getSupabaseConfig();
+    let syncRes: { success: boolean; message: string } | undefined = undefined;
+    if (cfg.isConfigured) {
+      syncRes = await syncUsersToSupabase(nextUsers);
+    }
+
+    return {
+      success: true,
+      user: newUser,
+      supabaseSync: syncRes,
+    };
   };
 
-  const removeUser = (userId: string): boolean => {
-    if (currentUser?.id === userId) return false;
-    setUsers((prev) => {
-      const next = prev.filter((u) => u.id !== userId);
-      const cfg = getSupabaseConfig();
-      if (cfg.isConfigured) {
-        syncUsersToSupabase(next).catch(console.error);
+  const removeUser = async (userId: string): Promise<{ success: boolean; message?: string }> => {
+    if (currentUser?.id === userId) {
+      return { success: false, message: 'Você não pode excluir o seu próprio usuário logado!' };
+    }
+    const userToRemove = users.find((u) => u.id === userId);
+    const nextUsers = users.filter((u) => u.id !== userId);
+    setUsers(nextUsers);
+
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      if (userToRemove) {
+        await deleteUserFromSupabase(userToRemove.id, userToRemove.username);
       }
-      return next;
-    });
-    return true;
+      await syncUsersToSupabase(nextUsers);
+    }
+    return { success: true };
   };
 
-  const updateUser = (userId: string, updates: Partial<User>) => {
+  const updateUser = async (userId: string, updates: Partial<User>): Promise<{ success: boolean; supabaseSync?: { success: boolean; message: string } }> => {
     const finalUpdates = { ...updates };
     if (finalUpdates.password) {
       finalUpdates.password = encryptPassword(finalUpdates.password);
     }
 
-    setUsers((prev) => {
-      const next = prev.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u));
-      const cfg = getSupabaseConfig();
-      if (cfg.isConfigured) {
-        syncUsersToSupabase(next).catch(console.error);
-      }
-      return next;
-    });
+    const nextUsers = users.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u));
+    setUsers(nextUsers);
 
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, ...finalUpdates } : null));
     }
+
+    const cfg = getSupabaseConfig();
+    let syncRes: { success: boolean; message: string } | undefined = undefined;
+    if (cfg.isConfigured) {
+      syncRes = await syncUsersToSupabase(nextUsers);
+    }
+
+    return { success: true, supabaseSync: syncRes };
   };
 
   const login = (username: string, password?: string): { success: boolean; message?: string } => {
@@ -633,30 +647,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [filteredRecords]);
 
   // Record CRUD
-  const addRecord = (newRec: ProductionRecord) => {
+  const addRecord = async (newRec: ProductionRecord): Promise<{ success: boolean; message: string; supabaseSynced: boolean; supabaseError?: string }> => {
+    const sanitizedRec = sanitizeProductionRecord(newRec, carcassCosts.SUINO || 9.30);
+
     setRecords((prev) => {
-      const idx = prev.findIndex((r) => r.id === newRec.id);
+      const idx = prev.findIndex((r) => r.id === sanitizedRec.id);
       if (idx >= 0) {
         const copy = [...prev];
-        copy[idx] = newRec;
+        copy[idx] = sanitizedRec;
         return copy;
       }
-      return [newRec, ...prev];
+      return [sanitizedRec, ...prev];
     });
 
     setFilters((prev) => ({
       ...prev,
-      date: newRec.date,
+      date: sanitizedRec.date,
       viewMode: 'daily',
     }));
 
     // If Supabase is configured, automatically send new batch to Supabase
     const cfg = getSupabaseConfig();
     if (cfg.isConfigured) {
-      syncRecordsToSupabase([newRec]).catch((err) => {
-        console.warn('Falha na sincronização em nuvem do novo lote:', err);
-      });
+      try {
+        const syncRes = await syncRecordsToSupabase([sanitizedRec]);
+        if (syncRes.success) {
+          return {
+            success: true,
+            message: 'Lote adicionado com sucesso e sincronizado no Supabase!',
+            supabaseSynced: true,
+          };
+        } else {
+          return {
+            success: true,
+            message: 'Lote salvo localmente, mas não foi possível sincronizar com o Supabase.',
+            supabaseSynced: false,
+            supabaseError: syncRes.message,
+          };
+        }
+      } catch (err: any) {
+        return {
+          success: true,
+          message: 'Lote salvo localmente, mas ocorreu erro no Supabase.',
+          supabaseSynced: false,
+          supabaseError: err.message,
+        };
+      }
     }
+
+    return {
+      success: true,
+      message: 'Lote adicionado com sucesso no aplicativo.',
+      supabaseSynced: false,
+    };
   };
 
   const deleteRecord = async (id: string): Promise<{ success: boolean; message: string }> => {
@@ -845,15 +888,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Supabase sync methods
   const syncSupabase = async () => {
-    const res = await syncRecordsToSupabase(records);
-    await syncUsersToSupabase(users);
-    return res;
+    const recRes = await syncRecordsToSupabase(records);
+    const userRes = await syncUsersToSupabase(users);
+
+    if (recRes.success && userRes.success) {
+      return {
+        success: true,
+        message: `Sincronização concluída com sucesso! ${records.length} lote(s) e ${users.length} usuário(s) salvos no Supabase.`,
+      };
+    }
+    if (!recRes.success && !userRes.success) {
+      return {
+        success: false,
+        message: `Erro ao sincronizar: Lotes (${recRes.message}) | Usuários (${userRes.message})`,
+      };
+    }
+    if (!recRes.success) {
+      return {
+        success: false,
+        message: `Usuários sincronizados (${users.length}), mas erro nos lotes: ${recRes.message}`,
+      };
+    }
+    return {
+      success: false,
+      message: `Lotes sincronizados (${records.length}), mas erro nos usuários: ${userRes.message}`,
+    };
   };
 
   const syncCleanToSupabase = async () => {
-    const res = await replaceRecordsInSupabase(records);
-    await syncUsersToSupabase(users);
-    return res;
+    const recRes = await replaceRecordsInSupabase(records);
+    const userRes = await syncUsersToSupabase(users);
+
+    if (recRes.success && userRes.success) {
+      return {
+        success: true,
+        message: `Sincronização limpa concluída! ${recRes.message} e ${users.length} usuário(s) no Supabase.`,
+        deletedCount: recRes.deletedCount,
+      };
+    }
+    return {
+      success: false,
+      message: `Erro na sincronização: ${recRes.message} | Usuários: ${userRes.message}`,
+    };
   };
 
   const fetchSupabase = async () => {

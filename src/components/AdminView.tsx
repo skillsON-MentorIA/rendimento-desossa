@@ -129,7 +129,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   };
 
   // Add user handler
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserUsername.trim() || !newUserPassword.trim()) {
       showFeedback('Por favor, preencha todos os campos obrigatórios do usuário.', 'error');
@@ -137,7 +137,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     }
 
     try {
-      addUser({
+      const res = await addUser({
         name: newUserName.trim(),
         username: newUserUsername.trim().toLowerCase(),
         email: newUserEmail.trim() || `${newUserUsername.trim().toLowerCase()}@frigorifico.com.br`,
@@ -152,35 +152,47 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
       setNewUserRole('GERENCIAL');
       setIsAddUserOpen(false);
 
-      showFeedback(`Usuário "${newUserUsername.trim()}" cadastrado com sucesso no perfil ${newUserRole}!`);
+      if (res.supabaseSync?.success) {
+        showFeedback(`✅ Usuário "${newUserUsername.trim()}" cadastrado e sincronizado no Supabase com sucesso!`, 'success');
+      } else if (res.supabaseSync?.success === false) {
+        showFeedback(`⚠️ Usuário criado localmente, mas erro no Supabase: ${res.supabaseSync.message}`, 'error');
+      } else {
+        showFeedback(`Usuário "${newUserUsername.trim()}" cadastrado com sucesso no perfil ${newUserRole}!`);
+      }
     } catch (err: any) {
       showFeedback(err.message || 'Erro ao cadastrar usuário.', 'error');
     }
   };
 
   // Remove user handler
-  const handleRemoveUser = (u: User) => {
+  const handleRemoveUser = async (u: User) => {
     if (u.id === currentUser?.id) {
       showFeedback('Você não pode excluir o seu próprio usuário logado!', 'error');
       return;
     }
     if (confirm(`Tem certeza que deseja descadastrar o usuário "${u.name}" (${u.username})?`)) {
-      const ok = removeUser(u.id);
-      if (ok) {
-        showFeedback(`Usuário "${u.name}" descadastrado com sucesso.`);
+      const res = await removeUser(u.id);
+      if (res.success) {
+        showFeedback(`Usuário "${u.name}" descadastrado com sucesso do sistema e da nuvem!`, 'success');
       } else {
-        showFeedback('Não foi possível descadastrar o usuário.', 'error');
+        showFeedback(res.message || 'Não foi possível descadastrar o usuário.', 'error');
       }
     }
   };
 
   // Change password handler
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser || !changePasswordVal.trim()) return;
 
-    updateUser(editingUser.id, { password: changePasswordVal.trim() });
-    showFeedback(`Senha do usuário ${editingUser.name} alterada com sucesso!`);
+    const res = await updateUser(editingUser.id, { password: changePasswordVal.trim() });
+    if (res.supabaseSync?.success) {
+      showFeedback(`✅ Senha do usuário ${editingUser.name} alterada e gravada no Supabase!`);
+    } else if (res.supabaseSync?.success === false) {
+      showFeedback(`⚠️ Senha alterada localmente, mas erro no Supabase: ${res.supabaseSync.message}`, 'error');
+    } else {
+      showFeedback(`Senha do usuário ${editingUser.name} alterada com sucesso!`);
+    }
     setEditingUser(null);
     setChangePasswordVal('');
     setShowEditPassword(false);
@@ -228,16 +240,33 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     showFeedback('Configuração personalizada removida. Usando variáveis do Netlify se houver.', 'info');
   };
 
+  // Sync users specifically to Supabase
+  const handleSyncUsersOnly = async () => {
+    setIsSyncing(true);
+    const res = await syncUsersToSupabase(users);
+    setIsSyncing(false);
+    if (res.success) {
+      showFeedback(`✅ ${users.length} usuário(s) sincronizado(s) com sucesso no Supabase!`, 'success');
+    } else {
+      showFeedback(res.message || 'Erro ao sincronizar usuários com o Supabase.', 'error');
+    }
+  };
+
   // Sync to Supabase
   const handleSyncToSupabase = async () => {
     setIsSyncing(true);
-    const res = await syncRecordsToSupabase(records);
-    await syncUsersToSupabase(users);
+    const recRes = await syncRecordsToSupabase(records);
+    const userRes = await syncUsersToSupabase(users);
     setIsSyncing(false);
-    if (res.success) {
-      showFeedback(res.message, 'success');
+
+    if (recRes.success && userRes.success) {
+      showFeedback(`✅ Sincronização geral concluída: ${records.length} lote(s) e ${users.length} usuário(s) gravados no Supabase!`, 'success');
+    } else if (!recRes.success && !userRes.success) {
+      showFeedback(`❌ Erro geral ao sincronizar: Lotes (${recRes.message}) | Usuários (${userRes.message})`, 'error');
+    } else if (!recRes.success) {
+      showFeedback(`⚠️ Usuários salvos (${users.length}), mas falha nos lotes: ${recRes.message}`, 'error');
     } else {
-      showFeedback(res.message, 'error');
+      showFeedback(`⚠️ Lotes salvos (${records.length}), mas falha nos usuários: ${userRes.message}`, 'error');
     }
   };
 
@@ -495,13 +524,26 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
               </p>
             </div>
 
-            <button
-              onClick={() => setIsAddUserOpen(!isAddUserOpen)}
-              className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 self-start sm:self-auto shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              {isAddUserOpen ? 'Fechar Formulário' : '+ Novo Usuário'}
-            </button>
+            <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleSyncUsersOnly}
+                disabled={isSyncing}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+                title="Sincronizar a lista de usuários e senhas criptografadas diretamente para o Supabase"
+              >
+                <UploadCloud className={`w-4 h-4 ${isSyncing ? 'animate-bounce' : ''}`} />
+                {isSyncing ? 'Sincronizando Usuários...' : 'Sincronizar Usuários com o Supabase'}
+              </button>
+
+              <button
+                onClick={() => setIsAddUserOpen(!isAddUserOpen)}
+                className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                {isAddUserOpen ? 'Fechar Formulário' : '+ Novo Usuário'}
+              </button>
+            </div>
           </div>
 
           {/* New User Form Drawer */}
@@ -1000,12 +1042,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleTestConnection}
                   disabled={isTestingConn}
-                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isTestingConn ? 'animate-spin' : ''}`} />
                   {isTestingConn ? 'Verificando...' : 'Testar Conexão'}
@@ -1013,12 +1055,24 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
 
                 <button
                   type="button"
+                  onClick={handleSyncUsersOnly}
+                  disabled={isSyncing}
+                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  title="Sincroniza apenas as contas e senhas de usuários com a tabela 'app_users' do Supabase"
+                >
+                  <Users className="w-3.5 h-3.5 text-emerald-200" />
+                  {isSyncing ? 'Sincronizando Usuários...' : 'Sincronizar Usuários com o Supabase'}
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleSyncToSupabase}
                   disabled={isSyncing}
-                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  title="Envia todos os lotes de produção e usuários cadastrados para o Supabase"
                 >
                   <UploadCloud className="w-3.5 h-3.5" />
-                  {isSyncing ? 'Sincronizando...' : 'Enviar Dados para Nuvem'}
+                  {isSyncing ? 'Sincronizando...' : 'Enviar Todos os Dados (Lotes + Usuários)'}
                 </button>
 
                 <button
