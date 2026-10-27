@@ -12,6 +12,7 @@ import {
   syncRecordsToSupabase,
   fetchRecordsFromSupabase,
   syncUsersToSupabase,
+  fetchUsersFromSupabase,
   deleteRecordFromSupabase,
   deleteAllRecordsFromSupabase,
   replaceRecordsInSupabase,
@@ -463,6 +464,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [lastExportDate]);
 
+  // Sincronização automática com o Supabase na inicialização do aplicativo
+  // Permite que qualquer usuário acessando pelo Netlify em outro dispositivo receba os dados reais
+  useEffect(() => {
+    const config = getSupabaseConfig();
+    if (!config.isConfigured) return;
+
+    let isMounted = true;
+
+    // Buscar usuários cadastrados no Supabase para permitir login em qualquer dispositivo
+    fetchUsersFromSupabase()
+      .then((res) => {
+        if (isMounted && res.success && res.data && res.data.length > 0) {
+          setUsers((prevLocal) => {
+            const map = new Map<string, User>();
+            prevLocal.forEach((u) => map.set(u.username.toLowerCase(), u));
+            res.data!.forEach((u) => {
+              map.set(u.username.toLowerCase(), {
+                ...u,
+                password: encryptPassword(u.password || 'admin123'),
+              });
+            });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch((err) => console.error('Erro na sincronização inicial de usuários:', err));
+
+    // Buscar lotes de produção cadastrados no Supabase
+    fetchRecordsFromSupabase()
+      .then((res) => {
+        if (isMounted && res.success && res.data && res.data.length > 0) {
+          setRecords((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const newFromRemote = res.data!.filter((p) => !existingIds.has(p.id));
+            if (newFromRemote.length > 0) {
+              return [...prev, ...newFromRemote.map((p) => sanitizeProductionRecord(p, 9.30))];
+            }
+            return prev;
+          });
+        }
+      })
+      .catch((err) => console.error('Erro na sincronização inicial de lotes:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // User management methods
   const addUser = (userData: Omit<User, 'id'>) => {
     const cleanUsername = userData.username.trim().toLowerCase();
@@ -478,12 +527,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       password: encryptPassword(userData.password || 'admin123'),
     };
 
-    setUsers((prev) => [...prev, newUser]);
+    setUsers((prev) => {
+      const next = [...prev, newUser];
+      const cfg = getSupabaseConfig();
+      if (cfg.isConfigured) {
+        syncUsersToSupabase(next).catch(console.error);
+      }
+      return next;
+    });
   };
 
   const removeUser = (userId: string): boolean => {
     if (currentUser?.id === userId) return false;
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setUsers((prev) => {
+      const next = prev.filter((u) => u.id !== userId);
+      const cfg = getSupabaseConfig();
+      if (cfg.isConfigured) {
+        syncUsersToSupabase(next).catch(console.error);
+      }
+      return next;
+    });
     return true;
   };
 
@@ -493,9 +556,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       finalUpdates.password = encryptPassword(finalUpdates.password);
     }
 
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u))
-    );
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u));
+      const cfg = getSupabaseConfig();
+      if (cfg.isConfigured) {
+        syncUsersToSupabase(next).catch(console.error);
+      }
+      return next;
+    });
+
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, ...finalUpdates } : null));
     }
