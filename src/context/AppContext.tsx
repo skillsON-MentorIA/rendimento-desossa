@@ -496,14 +496,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchRecordsFromSupabase()
       .then((res) => {
         if (isMounted && res.success && res.data && res.data.length > 0) {
+          const sanitizedRemote = res.data.map((p) => sanitizeProductionRecord(p, 9.30));
           setRecords((prev) => {
-            const existingIds = new Set(prev.map((p) => p.id));
-            const newFromRemote = res.data!.filter((p) => !existingIds.has(p.id));
-            if (newFromRemote.length > 0) {
-              return [...prev, ...newFromRemote.map((p) => sanitizeProductionRecord(p, 9.30))];
+            const isOnlyInitialDemo = prev.length <= 4 && prev.every((r) =>
+              r.id.startsWith('rec_dt_2026') ||
+              r.id.startsWith('rec_ds_2026') ||
+              r.id.startsWith('rec_tr_2026') ||
+              r.id.startsWith('rec_ct_2026')
+            );
+            if (isOnlyInitialDemo) {
+              return sanitizedRemote;
             }
-            return prev;
+            const map = new Map<string, ProductionRecord>();
+            prev.forEach((r) => map.set(r.id, r));
+            sanitizedRemote.forEach((r) => map.set(r.id, r));
+            return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
           });
+
+          // Calibra a data ativa para a data mais recente dos lotes reais carregados do Supabase
+          const dates = Array.from(new Set(sanitizedRemote.map((r) => r.date))).sort();
+          if (dates.length > 0) {
+            const latestDate = dates[dates.length - 1];
+            const oldestDate = dates[0];
+            setFilters((f) => ({
+              ...f,
+              date: latestDate,
+              startDate: oldestDate,
+              endDate: latestDate,
+              month: latestDate.substring(0, 7),
+            }));
+          }
         }
       })
       .catch((err) => console.error('Erro na sincronização inicial de lotes:', err));

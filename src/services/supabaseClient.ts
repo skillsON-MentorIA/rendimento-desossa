@@ -86,49 +86,178 @@ export function getSupabaseClient(): SupabaseClient | null {
   }
 }
 
+export interface SupabaseTestResult {
+  ok: boolean;
+  message: string;
+  details?: any;
+  readRecordsOk: boolean;
+  writeRecordsOk: boolean;
+  readUsersOk: boolean;
+  writeUsersOk: boolean;
+  rlsBlocked: boolean;
+  errors: string[];
+}
+
 /**
- * Tests connection with Supabase
+ * Tests connection with Supabase for BOTH Read and Write permissions on both tables.
+ * Accurately detects whether Row-Level Security (RLS) is blocking inserts/updates.
  */
-export async function testSupabaseConnection(): Promise<{ ok: boolean; message: string; details?: any }> {
+export async function testSupabaseConnection(): Promise<SupabaseTestResult> {
   const client = getSupabaseClient();
   if (!client) {
     return {
       ok: false,
       message: 'Supabase não está configurado. Preencha a URL e a Anon Key no Netlify ou no painel.',
+      readRecordsOk: false,
+      writeRecordsOk: false,
+      readUsersOk: false,
+      writeUsersOk: false,
+      rlsBlocked: false,
+      errors: ['Supabase não configurado.'],
     };
   }
 
+  const errors: string[] = [];
+  let readRecordsOk = false;
+  let writeRecordsOk = false;
+  let readUsersOk = false;
+  let writeUsersOk = false;
+  let rlsBlocked = false;
+
+  // 1. Test Read Production Records
   try {
-    // Attempt a light query to verify credentials and table existence
-    const { data, error } = await client.from('production_records').select('id').limit(1);
+    const { error } = await client.from('production_records').select('id').limit(1);
     if (error) {
-      if (error.code === '42P01') {
-        // Table doesn't exist yet
-        return {
-          ok: false,
-          message: 'Conectado ao Supabase, mas a tabela "production_records" ainda não foi criada. Execute o Script SQL fornecido no SQL Editor do Supabase.',
-          details: error,
-        };
+      errors.push(`Leitura de Lotes: ${error.message} (Código ${error.code})`);
+      if (error.code === '42501' || error.message.toLowerCase().includes('row-level security') || error.message.toLowerCase().includes('policy')) {
+        rlsBlocked = true;
       }
-      return {
-        ok: false,
-        message: `Erro do Supabase: ${error.message} (Código: ${error.code})`,
-        details: error,
-      };
+    } else {
+      readRecordsOk = true;
     }
-
-    return {
-      ok: true,
-      message: 'Conexão com o Supabase estabelecida com sucesso! Tabelas prontas.',
-      details: data,
-    };
-  } catch (err: any) {
-    return {
-      ok: false,
-      message: `Falha na requisição ao Supabase: ${err.message || 'Verifique sua conexão ou URL'}`,
-      details: err,
-    };
+  } catch (e: any) {
+    errors.push(`Leitura de Lotes: ${e.message}`);
   }
+
+  // 2. Test Write Production Records (Ping record)
+  try {
+    const pingId = `__ping_diag_${Date.now()}__`;
+    const pingRow = {
+      id: pingId,
+      date: '2026-01-01',
+      period_start: '2026-01-01',
+      period_end: '2026-01-01',
+      company_name: 'Ping Test',
+      emission_time: 'Agora',
+      type: 'DIANTEIRO',
+      shift: 'Turno 1',
+      responsible_operator: 'Diagnóstico',
+      operator_count: 20,
+      raw_material_code: '0',
+      raw_material_desc: 'Diagnóstico RLS',
+      raw_material_weight_kg: 1,
+      raw_material_boxes: 1,
+      raw_material_avg_weight_kg: 1,
+      carcass_cost_per_kg: 1,
+      total_carcass_cost: 1,
+      finished_product_weight_kg: 1,
+      finished_product_boxes: 1,
+      finished_product_total_value: 1,
+      loss_kg: 0,
+      loss_pct: 0,
+      saleable_cuts_weight_kg: 1,
+      saleable_cuts_boxes: 1,
+      bone_weight_kg: 0,
+      bone_pct: 0,
+      fat_weight_kg: 0,
+      fat_pct: 0,
+      non_saleable_weight_kg: 0,
+      non_saleable_pct: 0,
+      deboning_yield_net_pct: 100,
+      total_yield_pct: 100,
+      productivity_kg_per_person: 1,
+      gross_profit_value: 0,
+      profit_margin_pct: 0,
+      notes: 'Ping de diagnóstico RLS',
+      cuts: [],
+    };
+    const { error: insErr } = await client.from('production_records').upsert(pingRow, { onConflict: 'id' });
+    if (insErr) {
+      errors.push(`Gravação de Lotes: ${insErr.message} (Código ${insErr.code})`);
+      if (insErr.code === '42501' || insErr.message.toLowerCase().includes('row-level security') || insErr.message.toLowerCase().includes('policy') || insErr.message.toLowerCase().includes('violates')) {
+        rlsBlocked = true;
+      }
+    } else {
+      writeRecordsOk = true;
+      // Clean up ping record
+      await client.from('production_records').delete().eq('id', pingId);
+    }
+  } catch (e: any) {
+    errors.push(`Gravação de Lotes: ${e.message}`);
+  }
+
+  // 3. Test Read app_users
+  try {
+    const { error } = await client.from('app_users').select('id').limit(1);
+    if (error) {
+      errors.push(`Leitura de Usuários: ${error.message} (Código ${error.code})`);
+      if (error.code === '42501' || error.message.toLowerCase().includes('row-level security') || error.message.toLowerCase().includes('policy')) {
+        rlsBlocked = true;
+      }
+    } else {
+      readUsersOk = true;
+    }
+  } catch (e: any) {
+    errors.push(`Leitura de Usuários: ${e.message}`);
+  }
+
+  // 4. Test Write app_users (Ping user)
+  try {
+    const pingUserId = `__ping_usr_${Date.now()}__`;
+    const pingUserRow = {
+      id: pingUserId,
+      username: `__ping_${Date.now()}__`,
+      name: 'Ping Test User',
+      email: 'ping@test.com',
+      password: 'test',
+      role: 'ADMIN',
+    };
+    const { error: insUserErr } = await client.from('app_users').upsert(pingUserRow, { onConflict: 'id' });
+    if (insUserErr) {
+      errors.push(`Gravação de Usuários: ${insUserErr.message} (Código ${insUserErr.code})`);
+      if (insUserErr.code === '42501' || insUserErr.message.toLowerCase().includes('row-level security') || insUserErr.message.toLowerCase().includes('policy') || insUserErr.message.toLowerCase().includes('violates')) {
+        rlsBlocked = true;
+      }
+    } else {
+      writeUsersOk = true;
+      // Clean up ping user
+      await client.from('app_users').delete().eq('id', pingUserId);
+    }
+  } catch (e: any) {
+    errors.push(`Gravação de Usuários: ${e.message}`);
+  }
+
+  const allOk = readRecordsOk && writeRecordsOk && readUsersOk && writeUsersOk;
+
+  let message = '';
+  if (allOk) {
+    message = '✅ Conexão perfeita! Leitura e Gravação 100% liberadas em ambas as tabelas (production_records e app_users).';
+  } else if (rlsBlocked) {
+    message = '⚠️ AVISO CRÍTICO: Conexão ativa, mas a GRAVAÇÃO está BLOQUEADA pelas políticas RLS do Supabase! Execute o Script de Desbloqueio no SQL Editor do Supabase.';
+  } else {
+    message = `Falha na verificação: ${errors.join(' | ')}`;
+  }
+
+  return {
+    ok: allOk,
+    message,
+    readRecordsOk,
+    writeRecordsOk,
+    readUsersOk,
+    writeUsersOk,
+    rlsBlocked,
+    errors,
+  };
 }
 
 /**

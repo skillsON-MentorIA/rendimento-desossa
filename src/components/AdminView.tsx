@@ -37,6 +37,7 @@ import {
   saveCustomSupabaseConfig,
   clearCustomSupabaseConfig,
   testSupabaseConnection,
+  SupabaseTestResult,
   syncRecordsToSupabase,
   fetchRecordsFromSupabase,
   syncUsersToSupabase,
@@ -104,13 +105,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   const [inputUrl, setInputUrl] = useState<string>(supabaseConfig.url);
   const [inputKey, setInputKey] = useState<string>(supabaseConfig.anonKey);
   const [isTestingConn, setIsTestingConn] = useState<boolean>(false);
-  const [connStatus, setConnStatus] = useState<{ checked: boolean; ok: boolean; msg: string }>({
+  const [connStatus, setConnStatus] = useState<{ checked: boolean; ok: boolean; msg: string; details?: SupabaseTestResult }>({
     checked: false,
     ok: false,
     msg: '',
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [copiedSql, setCopiedSql] = useState<boolean>(false);
+  const [copiedRlsSql, setCopiedRlsSql] = useState<boolean>(false);
 
   // Parameters state
   const [dtCost, setDtCost] = useState<number>(15.20);
@@ -201,13 +203,14 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   // Test Supabase connection
   const handleTestConnection = async () => {
     setIsTestingConn(true);
-    setConnStatus({ checked: false, ok: false, msg: 'Testando conexão...' });
+    setConnStatus({ checked: false, ok: false, msg: 'Testando permissões de Leitura e Gravação no Supabase...' });
     const res = await testSupabaseConnection();
     setIsTestingConn(false);
     setConnStatus({
       checked: true,
       ok: res.ok,
       msg: res.message,
+      details: res,
     });
     if (res.ok) {
       showFeedback(res.message, 'success');
@@ -1099,21 +1102,75 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
               </div>
             </div>
 
-            {/* Test Connection Banner */}
+            {/* Test Connection Banner & RLS Diagnostic */}
             {connStatus.checked && (
-              <div
-                className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2.5 ${
-                  connStatus.ok
-                    ? 'bg-emerald-50 text-emerald-900 border border-emerald-200'
-                    : 'bg-rose-50 text-rose-900 border border-rose-200'
-                }`}
-              >
-                {connStatus.ok ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <div className="space-y-3">
+                <div
+                  className={`p-4 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    connStatus.ok
+                      ? 'bg-emerald-50 text-emerald-950 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-950 border border-rose-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 font-bold">
+                    {connStatus.ok ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+                    )}
+                    <span>{connStatus.msg}</span>
+                  </div>
+
+                  {connStatus.details && (
+                    <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold ${connStatus.details.readRecordsOk ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                        Lotes Ler: {connStatus.details.readRecordsOk ? 'OK' : 'Falhou'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold ${connStatus.details.writeRecordsOk ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                        Lotes Gravar: {connStatus.details.writeRecordsOk ? 'OK' : 'Bloqueado'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold ${connStatus.details.readUsersOk ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                        Usuários Ler: {connStatus.details.readUsersOk ? 'OK' : 'Falhou'}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold ${connStatus.details.writeUsersOk ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}`}>
+                        Usuários Gravar: {connStatus.details.writeUsersOk ? 'OK' : 'Bloqueado'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {connStatus.details?.rlsBlocked && (
+                  <div className="p-4 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs space-y-3">
+                    <div className="flex items-start gap-2.5 text-amber-950">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <strong className="text-sm text-amber-900 block font-bold">
+                          Causa do Bloqueio: Políticas de Segurança RLS Ativas no Supabase
+                        </strong>
+                        <p className="mt-1 text-slate-700 leading-relaxed">
+                          O Supabase está com <strong>Row Level Security (RLS)</strong> ativo nas tabelas, o que impede gravações com a chave pública do aplicativo. Para desbloquear imediatamente a gravação de novos lotes e usuários, execute no <strong>SQL Editor</strong> do seu Supabase:
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900 text-emerald-400 p-3 rounded-lg font-mono text-[11px] flex items-center justify-between gap-2 overflow-x-auto">
+                      <code>ALTER TABLE public.production_records DISABLE ROW LEVEL SECURITY; ALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;</code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText('ALTER TABLE public.production_records DISABLE ROW LEVEL SECURITY;\nALTER TABLE public.app_users DISABLE ROW LEVEL SECURITY;');
+                          setCopiedRlsSql(true);
+                          setTimeout(() => setCopiedRlsSql(false), 3000);
+                          showFeedback('Comando SQL de desbloqueio RLS copiado!', 'success');
+                        }}
+                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-[10px] shrink-0 transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3" />
+                        {copiedRlsSql ? 'Copiado!' : 'Copiar SQL'}
+                      </button>
+                    </div>
+                  </div>
                 )}
-                <span>{connStatus.msg}</span>
               </div>
             )}
 
