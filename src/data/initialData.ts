@@ -11,6 +11,16 @@ export const INITIAL_USERS: User[] = [
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
     shift: 'Turno 1',
   },
+  {
+    id: 'usr_diretoria',
+    name: 'Diretoria Executiva',
+    username: 'diretoria',
+    password: 'diretoria2026',
+    email: 'diretoria@frigo-industrial.com.br',
+    role: 'DIRETORIA_EXECUTIVA',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    shift: 'Turno 1',
+  },
 ];
 
 export const INITIAL_OPERATORS: OperatorStat[] = [

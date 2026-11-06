@@ -1,5 +1,24 @@
 @import "tailwindcss";
 
+/* Suporte avançado para Notch do iPhone, barra de navegação do Android e gestos touch */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+}
+
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 0.75rem);
+}
+
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.5rem);
+}
+
 @media print {
   @page {
     size: A4 portrait;

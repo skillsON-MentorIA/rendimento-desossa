@@ -5,7 +5,7 @@ import {
   INITIAL_PRODUCTION_RECORDS,
   INITIAL_USERS
 } from '../data/initialData';
-import { CutItem, CutType, FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole } from '../types';
+import { CutItem, CutType, FilterState, MarketBenchmark, OperatorStat, ProductionRecord, User, UserRole, LoginLog } from '../types';
 import { CalculatedSummary, calculateSummary, cleanRawMaterialName } from '../utils/calculations';
 import { encryptPassword, decryptPassword, verifyPassword } from '../utils/securityCrypto';
 import {
@@ -18,6 +18,9 @@ import {
   deleteAllRecordsFromSupabase,
   replaceRecordsInSupabase,
   getSupabaseConfig,
+  recordLoginInSupabase,
+  fetchLoginLogsFromSupabase,
+  clearLoginLogsInSupabase,
 } from '../services/supabaseClient';
 
 interface AppContextType {
@@ -27,6 +30,9 @@ interface AppContextType {
   addUser: (user: Omit<User, 'id'>) => Promise<{ success: boolean; user: User; supabaseSync?: { success: boolean; message: string } }>;
   removeUser: (userId: string) => Promise<{ success: boolean; message?: string }>;
   updateUser: (userId: string, updates: Partial<User>) => Promise<{ success: boolean; supabaseSync?: { success: boolean; message: string } }>;
+  loginLogs: LoginLog[];
+  fetchLoginLogs: () => Promise<void>;
+  clearLoginLogs: () => Promise<void>;
   records: ProductionRecord[];
   filteredRecords: ProductionRecord[];
   summary: CalculatedSummary;
@@ -63,6 +69,7 @@ interface AppContextType {
   canUpload: boolean;
   isAdmin: boolean;
   isDirectoria: boolean;
+  isExecutiveMobile: boolean;
   syncSupabase: () => Promise<{ success: boolean; message: string }>;
   syncCleanToSupabase: () => Promise<{ success: boolean; message: string; deletedCount?: number }>;
   fetchSupabase: () => Promise<{ success: boolean; message: string }>;
@@ -77,6 +84,26 @@ const STORAGE_KEY_USERS = 'frigo_kpi_users_v3';
 const STORAGE_KEY_BENCHMARKS = 'frigo_kpi_benchmarks_v1';
 const STORAGE_KEY_LAST_EXPORT = 'frigo_last_export_date_v1';
 const STORAGE_KEY_CARCASS_COSTS = 'frigo_kpi_carcass_costs_v2';
+const STORAGE_KEY_LOGIN_LOGS = 'frigo_kpi_login_history_v1';
+
+function detectDeviceInfo(): string {
+  if (typeof navigator === 'undefined') return 'Navegador Web';
+  const ua = navigator.userAgent || '';
+  let browser = 'Navegador Web';
+  if (ua.includes('Edg/')) browser = 'Edge';
+  else if (ua.includes('Chrome/')) browser = 'Google Chrome';
+  else if (ua.includes('Firefox/')) browser = 'Firefox';
+  else if (ua.includes('Safari/')) browser = 'Safari';
+
+  let os = 'Dispositivo';
+  if (ua.includes('Windows')) os = 'Windows PC';
+  else if (ua.includes('Macintosh') || ua.includes('Mac OS')) os = 'macOS';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+
+  return `${browser} (${os})`;
+}
 
 export interface CarcassCostsState {
   DIANTEIRO: number;
@@ -346,6 +373,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return null;
   });
 
+  // Histórico de Acessos & Logins (Persistido localmente e sincronizado com o Supabase)
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY_LOGIN_LOGS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [];
+  });
+
+  const fetchLoginLogs = async () => {
+    const res = await fetchLoginLogsFromSupabase();
+    if (res.success && res.data) {
+      setLoginLogs(res.data);
+      try {
+        localStorage.setItem(STORAGE_KEY_LOGIN_LOGS, JSON.stringify(res.data));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const clearLoginLogs = async () => {
+    setLoginLogs([]);
+    localStorage.removeItem(STORAGE_KEY_LOGIN_LOGS);
+    const cfg = getSupabaseConfig();
+    if (cfg.isConfigured) {
+      await clearLoginLogsInSupabase();
+    }
+  };
+
   // Production records persisted in localStorage with deleted IDs blacklist
   const [records, setRecords] = useState<ProductionRecord[]>(() => {
     let deletedIds = new Set<string>();
@@ -530,6 +592,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
       .catch((err) => console.error('Erro na sincronização inicial de lotes:', err));
 
+    // Buscar histórico de logins gravados no Supabase
+    fetchLoginLogsFromSupabase()
+      .then((res) => {
+        if (isMounted && res.success && res.data) {
+          setLoginLogs((prev) => {
+            const map = new Map<string, LoginLog>();
+            prev.forEach((l) => map.set(l.id, l));
+            res.data!.forEach((l) => map.set(l.id, l));
+            const merged = Array.from(map.values()).sort((a, b) => b.loginAt.localeCompare(a.loginAt));
+            try {
+              localStorage.setItem(STORAGE_KEY_LOGIN_LOGS, JSON.stringify(merged));
+            } catch (e) {
+              console.error(e);
+            }
+            return merged;
+          });
+        }
+      })
+      .catch((err) => console.error('Erro na sincronização de histórico de logins:', err));
+
     return () => {
       isMounted = false;
     };
@@ -629,6 +711,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setCurrentUser(user);
+
+    // Registra o evento de login no histórico local e na nuvem do Supabase
+    const logItem: LoginLog = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      userId: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      loginAt: new Date().toISOString(),
+      deviceInfo: detectDeviceInfo(),
+      status: 'SUCESSO',
+    };
+
+    setLoginLogs((prev) => {
+      const next = [logItem, ...prev.filter((l) => l.id !== logItem.id)].slice(0, 500);
+      try {
+        localStorage.setItem(STORAGE_KEY_LOGIN_LOGS, JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+      return next;
+    });
+
+    // Envia assincronamente para o Supabase
+    recordLoginInSupabase(logItem).catch((err) =>
+      console.warn('Registro de login assíncrono no Supabase:', err)
+    );
+
     return { success: true };
   };
 
@@ -670,7 +780,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Record CRUD
   const addRecord = async (newRec: ProductionRecord): Promise<{ success: boolean; message: string; supabaseSynced: boolean; supabaseError?: string }> => {
-    const sanitizedRec = sanitizeProductionRecord(newRec, carcassCosts.SUINO || 9.30);
+    // 1. Vincula auditoria de quem fez o upload e data/horário
+    const recordWithAudit: ProductionRecord = {
+      ...newRec,
+      uploadedBy: newRec.uploadedBy || currentUser?.name || 'Administrador',
+      uploadedByUsername: newRec.uploadedByUsername || currentUser?.username || 'admin',
+      uploadedAt: newRec.uploadedAt || new Date().toISOString(),
+    };
+
+    const sanitizedRec = sanitizeProductionRecord(recordWithAudit, carcassCosts.SUINO || 9.30);
 
     setRecords((prev) => {
       const idx = prev.findIndex((r) => r.id === sanitizedRec.id);
@@ -969,7 +1087,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isAdmin = currentUser?.role === 'ADMIN';
   const canUpload = currentUser?.role === 'ADMIN' || currentUser?.role === 'GERENCIAL';
   const canEdit = currentUser?.role === 'ADMIN' || currentUser?.role === 'GERENCIAL';
-  const isDirectoria = currentUser?.role === 'DIRETORIA';
+  const isDirectoria = currentUser?.role === 'DIRETORIA' || currentUser?.role === 'DIRETORIA_EXECUTIVA';
+  const isExecutiveMobile = currentUser?.role === 'DIRETORIA_EXECUTIVA';
 
   return (
     <AppContext.Provider
@@ -980,6 +1099,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addUser,
         removeUser,
         updateUser,
+        loginLogs,
+        fetchLoginLogs,
+        clearLoginLogs,
         records,
         filteredRecords,
         summary,
@@ -1006,6 +1128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         canUpload,
         isAdmin,
         isDirectoria,
+        isExecutiveMobile,
         syncSupabase,
         syncCleanToSupabase,
         fetchSupabase,

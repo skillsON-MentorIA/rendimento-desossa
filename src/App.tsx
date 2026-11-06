@@ -19,9 +19,10 @@ import { SettingsView } from './components/SettingsView';
 import { AdminView } from './components/AdminView';
 import { LoginScreen } from './components/LoginScreen';
 import { LoginModal } from './components/LoginModal';
+import { ExecutiveMobileView } from './components/ExecutiveMobileView';
 
 const MainLayout: React.FC = () => {
-  const { currentUser } = useApp();
+  const { currentUser, logout } = useApp();
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -39,7 +40,7 @@ const MainLayout: React.FC = () => {
 
     if ((currentTab === 'admin' || currentTab === 'settings') && currentUser.role !== 'ADMIN') {
       setCurrentTab('dashboard');
-    } else if (currentTab === 'upload' && currentUser.role === 'DIRETORIA') {
+    } else if (currentTab === 'upload' && (currentUser.role === 'DIRETORIA' || currentUser.role === 'DIRETORIA_EXECUTIVA')) {
       setCurrentTab('dashboard');
     }
   }, [currentUser, currentTab]);
@@ -60,6 +61,22 @@ const MainLayout: React.FC = () => {
   // If no user is logged in, show full screen corporative login page
   if (!currentUser) {
     return <LoginScreen />;
+  }
+
+  // REGRA EXCLUSIVA SOLICITADA:
+  // Se o usuário logado for do perfil DIRETORIA EXECUTIVA, libera APENAS a visão MOBILE
+  if (currentUser.role === 'DIRETORIA_EXECUTIVA') {
+    return <ExecutiveMobileView onLogout={logout} />;
+  }
+
+  // Permite ao Administrador simular e visualizar o Cockpit Mobile da Diretoria
+  if (currentTab === 'mobile_diretoria') {
+    return (
+      <ExecutiveMobileView
+        onBack={() => setCurrentTab('dashboard')}
+        onLogout={logout}
+      />
+    );
   }
 
   return (

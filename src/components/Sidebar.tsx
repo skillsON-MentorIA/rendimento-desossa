@@ -16,7 +16,8 @@ import {
   Shield,
   LogOut,
   User as UserIcon,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -98,6 +99,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Layers,
       badge: 'Novo',
       desc: 'Consolidado por Tipo vs Padrão',
+    },
+    {
+      id: 'mobile_diretoria',
+      label: 'Cockpit Mobile (Diretoria)',
+      icon: Smartphone,
+      badge: 'Celular',
+      desc: 'Visão Exclusiva Executiva',
     },
     ...(isAdmin
       ? [

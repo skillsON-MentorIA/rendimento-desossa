@@ -645,6 +645,11 @@ export const OnePageReportCortes: React.FC<OnePageReportCortesProps> = ({
               <div className="text-right text-[9px] text-slate-600 space-y-0.5 font-mono">
                 <div><strong>SisAtak RETQ010</strong> • Empresa: 021 • Lista: 101</div>
                 <div>Emissão: {activeRecord.emissionTime || '28/08/2026 11:08 h'} • Pág. 0001/0001</div>
+                {activeRecord.uploadedBy && (
+                  <div className="text-blue-900 font-bold">
+                    Upload: {activeRecord.uploadedBy} {activeRecord.uploadedAt ? `(${new Date(activeRecord.uploadedAt).toLocaleDateString('pt-BR')} ${new Date(activeRecord.uploadedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})` : ''}
+                  </div>
+                )}
               </div>
             </div>
 

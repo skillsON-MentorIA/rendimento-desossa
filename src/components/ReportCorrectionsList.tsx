@@ -247,6 +247,17 @@ export const ReportCorrectionsList: React.FC<ReportCorrectionsListProps> = ({
                           <Users className="w-3 h-3 text-slate-400" />
                           {rec.operatorCount} pessoas
                         </div>
+                        {rec.uploadedBy && (
+                          <div className="text-[10px] text-purple-900 bg-purple-50/90 px-2 py-0.5 rounded border border-purple-200 mt-1 inline-flex items-center gap-1">
+                            <span className="font-bold">Upload:</span>
+                            <span className="truncate max-w-[120px] font-medium">{rec.uploadedBy}</span>
+                            {rec.uploadedAt && (
+                              <span className="text-[9.5px] text-purple-700 font-mono">
+                                • {new Date(rec.uploadedAt).toLocaleDateString('pt-BR')} {new Date(rec.uploadedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* Matéria-Prima */}

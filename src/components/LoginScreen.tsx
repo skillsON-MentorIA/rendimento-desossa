@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Lock,
   User as UserIcon,
@@ -7,9 +7,14 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  ArrowRight
+  ArrowRight,
+  ScanFace,
+  Smartphone,
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { getEnrolledBiometric, authenticateWithFaceBiometrics, BiometricProfile } from '../utils/biometricAuth';
 
 export const LoginScreen: React.FC = () => {
   const { login } = useApp();
@@ -18,6 +23,34 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isBiometricLoading, setIsBiometricLoading] = useState<boolean>(false);
+  const [enrolledBio, setEnrolledBio] = useState<BiometricProfile | null>(null);
+
+  useEffect(() => {
+    const bio = getEnrolledBiometric();
+    setEnrolledBio(bio);
+  }, []);
+
+  const handleBiometricLogin = async () => {
+    setError('');
+    setIsBiometricLoading(true);
+    try {
+      const res = await authenticateWithFaceBiometrics();
+      if (res.success && res.username) {
+        // Realiza o login direto do usuário autorizado
+        const loginRes = login(res.username);
+        if (!loginRes.success) {
+          setError(loginRes.message || 'Falha ao autenticar biometria.');
+        }
+      } else {
+        setError(res.message || 'Leitura facial não confirmada.');
+      }
+    } catch {
+      setError('Erro ao processar leitura facial.');
+    } finally {
+      setIsBiometricLoading(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,18 +83,22 @@ export const LoginScreen: React.FC = () => {
         <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-rose-800 via-rose-600 to-slate-800" />
 
         {/* Branding & Header */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-rose-900/10 text-rose-900 border border-rose-900/20 flex items-center justify-center mx-auto mb-3.5 shadow-xs">
-            <Beef className="w-8 h-8" />
+        <div className="text-center mb-7">
+          <div className="h-14 px-3.5 py-1 rounded-2xl bg-white border border-slate-200 inline-flex items-center justify-center mx-auto mb-2.5 shadow-xs">
+            <img
+              src="/bh_foods_logo.png"
+              alt="BH Foods"
+              className="h-10 w-auto object-contain"
+            />
           </div>
           <span className="text-[10px] uppercase font-mono tracking-widest text-rose-800 font-bold block">
-            SisAtak Industrial
+            BH Foods • SisAtak Industrial
           </span>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
             Frigorífico KPI Pro
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Painel de Gestão e Rendimento da Desossa
+            Painel Executivo & Rendimento da Desossa
           </p>
         </div>
 
@@ -70,6 +107,31 @@ export const LoginScreen: React.FC = () => {
           <div className="p-3.5 mb-5 bg-rose-50 border border-rose-200 text-rose-900 text-xs rounded-xl flex items-center gap-2.5 animate-in fade-in">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span className="font-semibold">{error}</span>
+          </div>
+        )}
+
+        {/* Biometric Face ID Login Card if Enrolled */}
+        {enrolledBio && (
+          <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl space-y-2.5 shadow-xs">
+            <div className="flex items-center justify-between text-xs text-emerald-950 font-bold">
+              <div className="flex items-center gap-2">
+                <ScanFace className="w-4 h-4 text-emerald-600" />
+                <span>Leitura Facial Ativa</span>
+              </div>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300 font-semibold truncate max-w-[130px]">
+                {enrolledBio.name}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleBiometricLogin}
+              disabled={isBiometricLoading}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-950/20 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+            >
+              <ScanFace className="w-4 h-4" />
+              {isBiometricLoading ? 'Autenticando Leitura Facial...' : 'Acessar com Leitura Facial (Face ID)'}
+            </button>
           </div>
         )}
 
@@ -88,7 +150,7 @@ export const LoginScreen: React.FC = () => {
                 placeholder="Digite seu usuário ou e-mail"
                 className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-800/20 focus:border-rose-800 transition-all font-medium text-slate-900"
                 required
-                autoFocus
+                autoFocus={!enrolledBio}
               />
             </div>
           </div>
@@ -124,12 +186,44 @@ export const LoginScreen: React.FC = () => {
             className="w-full py-3 bg-rose-900 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4 cursor-pointer"
           >
             <Lock className="w-4 h-4" />
-            {isLoading ? 'Autenticando...' : 'Acessar o Sistema'}
+            {isLoading ? 'Autenticando...' : 'Acessar com Senha'}
             <ArrowRight className="w-4 h-4 ml-0.5" />
           </button>
         </form>
 
-        <div className="mt-8 pt-4 border-t border-slate-100 text-center">
+        {/* Informative Tip for Diretoria */}
+        {!enrolledBio && (
+          <div className="mt-3.5 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 flex items-start gap-2">
+            <ScanFace className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>
+              <strong>Diretoria Executiva:</strong> faça seu 1º acesso com login e senha e ative o <strong>Face ID / Leitura Facial</strong> no menu para entrar instantaneamente nos próximos acessos.
+            </span>
+          </div>
+        )}
+
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center space-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('admin');
+                setPassword('admin123');
+              }}
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold border border-slate-200 transition-colors cursor-pointer"
+            >
+              🔑 Acesso Admin
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('diretoria');
+                setPassword('diretoria2026');
+              }}
+              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200 transition-colors cursor-pointer"
+            >
+              📱 Diretoria Executiva (Mobile)
+            </button>
+          </div>
           <p className="text-[11px] text-slate-400">
             Acesso restrito e monitorado • Módulo de Desossa Industrial
           </p>

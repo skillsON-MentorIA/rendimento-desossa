@@ -26,10 +26,19 @@ import {
   Server,
   DollarSign,
   Scale,
-  Beef
+  Beef,
+  Clock,
+  Monitor,
+  Smartphone,
+  Globe,
+  Search,
+  Filter,
+  History,
+  Calendar
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../context/AppContext';
-import { User, UserRole, ProductionRecord } from '../types';
+import { User, UserRole, ProductionRecord, LoginLog } from '../types';
 import { formatCurrency, formatPct } from '../utils/calculations';
 import { decryptPassword, encryptPassword, isPasswordEncrypted } from '../utils/securityCrypto';
 import {
@@ -56,6 +65,9 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     addUser,
     removeUser,
     updateUser,
+    loginLogs,
+    fetchLoginLogs,
+    clearLoginLogs,
     records,
     deleteRecord,
     deleteAllRecords,
@@ -68,8 +80,13 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     isAdmin,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'users' | 'database' | 'netlify' | 'parameters'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'logins' | 'database' | 'netlify' | 'parameters'>('users');
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  // Login history search and filter state
+  const [loginSearch, setLoginSearch] = useState<string>('');
+  const [loginRoleFilter, setLoginRoleFilter] = useState<'ALL' | UserRole>('ALL');
+  const [isRefreshingLogins, setIsRefreshingLogins] = useState<boolean>(false);
 
   // User management form state
   const [isAddUserOpen, setIsAddUserOpen] = useState<boolean>(false);
@@ -351,6 +368,65 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
     }
   };
 
+  // Filtered login logs
+  const filteredLoginLogs = React.useMemo(() => {
+    return loginLogs.filter((l) => {
+      if (loginRoleFilter !== 'ALL' && l.role !== loginRoleFilter) return false;
+      if (loginSearch.trim()) {
+        const q = loginSearch.toLowerCase();
+        const matchesUser = l.username.toLowerCase().includes(q);
+        const matchesName = l.name.toLowerCase().includes(q);
+        const matchesDevice = (l.deviceInfo || '').toLowerCase().includes(q);
+        if (!matchesUser && !matchesName && !matchesDevice) return false;
+      }
+      return true;
+    });
+  }, [loginLogs, loginRoleFilter, loginSearch]);
+
+  const handleRefreshLoginLogs = async () => {
+    setIsRefreshingLogins(true);
+    try {
+      await fetchLoginLogs();
+      showFeedback('Histórico de acessos atualizado da nuvem Supabase com sucesso!', 'success');
+    } catch (e: any) {
+      showFeedback(`Erro ao atualizar acessos: ${e.message}`, 'error');
+    } finally {
+      setIsRefreshingLogins(false);
+    }
+  };
+
+  const handleExportLoginLogsExcel = () => {
+    if (loginLogs.length === 0) {
+      showFeedback('Nenhum registro de acesso para exportar.', 'info');
+      return;
+    }
+    const dataRows = loginLogs.map((l, idx) => ({
+      'Item': idx + 1,
+      'ID Acesso': l.id,
+      'Usuário': l.username,
+      'Nome Completo': l.name,
+      'Perfil de Acesso': l.role,
+      'Data e Horário': new Date(l.loginAt).toLocaleString('pt-BR'),
+      'Dispositivo / Navegador': l.deviceInfo || 'Navegador Web',
+      'Status': l.status || 'SUCESSO',
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(dataRows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Historico_Logins');
+    XLSX.writeFile(wb, `Historico_Logins_Supabase_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showFeedback('Planilha de histórico de acessos exportada com sucesso!', 'success');
+  };
+
+  const handleClearAllLoginLogs = async () => {
+    if (confirm('Tem certeza que deseja limpar o histórico de acessos? Esta ação apagará os registros locais e no banco Supabase.')) {
+      await clearLoginLogs();
+      showFeedback('Histórico de acessos limpo com sucesso.', 'info');
+    }
+  };
+
+  const [copiedLoginSql, setCopiedLoginSql] = useState<boolean>(false);
+
   // Save Costs
   const handleSaveCosts = (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,7 +541,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-slate-800 overflow-x-auto text-xs font-bold">
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 ${
+            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === 'users'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -476,39 +552,54 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
           </button>
 
           <button
+            onClick={() => {
+              setActiveTab('logins');
+              fetchLoginLogs();
+            }}
+            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeTab === 'logins'
+                ? 'bg-purple-600 text-white shadow-sm'
+                : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Clock className="w-4 h-4 text-amber-400" />
+            <span>2. Histórico de Acessos & Logins ({loginLogs.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('database')}
-            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 ${
+            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === 'database'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
           >
             <Database className="w-4 h-4 text-emerald-400" />
-            <span>2. Banco de Dados Supabase</span>
+            <span>3. Banco de Dados Supabase</span>
           </button>
 
           <button
             onClick={() => setActiveTab('netlify')}
-            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 ${
+            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === 'netlify'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
           >
             <Server className="w-4 h-4 text-blue-400" />
-            <span>3. Como Configurar Netlify + Supabase</span>
+            <span>4. Como Configurar Netlify + Supabase</span>
           </button>
 
           <button
             onClick={() => setActiveTab('parameters')}
-            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 ${
+            className={`px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
               activeTab === 'parameters'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
             }`}
           >
             <Sliders className="w-4 h-4 text-amber-400" />
-            <span>4. Parâmetros & Custos Carcaça</span>
+            <span>5. Parâmetros & Custos Carcaça</span>
           </button>
         </div>
       </div>
@@ -701,9 +792,35 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                         className="mt-0.5 text-amber-700 focus:ring-amber-700"
                       />
                       <div>
-                        <span className="font-bold text-amber-950 block">DIRETORIA (Visualização Executiva)</span>
+                        <span className="font-bold text-amber-950 block">DIRETORIA (Visualização Executiva Desktop)</span>
                         <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                          Apenas visualização dos dashboards, gráficos de desempenho e One Page Report A4. Sem upload nem alterações.
+                          Visualização geral dos dashboards, gráficos de desempenho e One Page Report A4. Sem upload nem alterações.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`p-3 rounded-xl border text-xs cursor-pointer transition-all flex items-start gap-3 ${
+                        newUserRole === 'DIRETORIA_EXECUTIVA'
+                          ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-500/20'
+                          : 'border-slate-200 bg-white/60 hover:bg-white'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value="DIRETORIA_EXECUTIVA"
+                        checked={newUserRole === 'DIRETORIA_EXECUTIVA'}
+                        onChange={() => setNewUserRole('DIRETORIA_EXECUTIVA')}
+                        className="mt-0.5 text-emerald-700 focus:ring-emerald-700"
+                      />
+                      <div>
+                        <span className="font-bold text-emerald-950 flex items-center gap-1.5">
+                          <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                          DIRETORIA EXECUTIVA (Visão Mobile Exclusiva)
+                        </span>
+                        <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                          Visão EXCLUSIVA no formato MOBILE (ajustado para smartphone) com cockpit corporativo em fundo preto, 8 KPIs, gráfico histórico e exportação para WhatsApp. Apenas consulta.
                         </span>
                       </div>
                     </label>
@@ -834,11 +951,17 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                                 ? 'bg-purple-100 text-purple-900 border border-purple-200'
                                 : u.role === 'GERENCIAL'
                                 ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                                : u.role === 'DIRETORIA_EXECUTIVA'
+                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 font-black'
                                 : 'bg-amber-100 text-amber-900 border border-amber-200'
                             }`}
                           >
-                            <Shield className="w-3 h-3" />
-                            {u.role}
+                            {u.role === 'DIRETORIA_EXECUTIVA' ? (
+                              <Smartphone className="w-3 h-3 text-emerald-700" />
+                            ) : (
+                              <Shield className="w-3 h-3" />
+                            )}
+                            {u.role === 'DIRETORIA_EXECUTIVA' ? 'DIRETORIA EXECUTIVA' : u.role}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-[11px] text-slate-600 max-w-xs">
@@ -855,6 +978,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                           {u.role === 'DIRETORIA' && (
                             <span className="text-amber-900 font-medium">
                               Visualização de Dashboards, Gráficos e One Page Report (Somente Leitura)
+                            </span>
+                          )}
+                          {u.role === 'DIRETORIA_EXECUTIVA' && (
+                            <span className="text-emerald-950 font-bold flex items-center gap-1.5">
+                              <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              Visão Exclusiva Mobile (Celular) • Cockpit Estratégico de Indicadores
                             </span>
                           )}
                         </td>
@@ -993,7 +1122,315 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
         </div>
       )}
 
-      {/* TAB 2: BANCO DE DADOS SUPABASE */}
+      {/* TAB 2: HISTÓRICO DE ACESSOS & LOGINS (SUPABASE) */}
+      {activeTab === 'logins' && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Histórico de Acessos & Auditoria de Logins
+                  </h3>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                    <Database className="w-3 h-3 text-emerald-700" />
+                    Nuvem Supabase
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
+                  Registro em tempo real de todos os logins realizados no sistema. Como os colaboradores acessam de diferentes computadores, dispositivos e filiais, os acessos são atrelados à conta do usuário e armazenados centralizadamente na tabela <code className="text-amber-900 font-bold bg-amber-50 px-1 rounded">login_history</code> do Supabase.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <button
+                type="button"
+                onClick={handleRefreshLoginLogs}
+                disabled={isRefreshingLogins}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Buscar os acessos mais recentes gravados no Supabase por outros computadores"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isRefreshingLogins ? 'animate-spin' : ''}`} />
+                <span>{isRefreshingLogins ? 'Atualizando...' : 'Atualizar da Nuvem'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportLoginLogsExcel}
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                title="Exportar histórico completo para planilha Excel"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Exportar (.xlsx)</span>
+              </button>
+
+              {loginLogs.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllLoginLogs}
+                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Limpar registros de acesso"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Limpar</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 4 KPI Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-slate-500 text-xs block font-medium">Total de Acessos</span>
+              <span className="text-2xl font-black text-slate-900 font-mono mt-1 block">
+                {loginLogs.length}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">Logins catalogados</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-slate-500 text-xs block font-medium">Usuários Distintos</span>
+              <span className="text-2xl font-black text-purple-700 font-mono mt-1 block">
+                {new Set(loginLogs.map((l) => l.username.toLowerCase())).size}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">Contas ativas identificadas</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-slate-500 text-xs block font-medium">Acessos Hoje</span>
+              <span className="text-2xl font-black text-emerald-700 font-mono mt-1 block">
+                {loginLogs.filter((l) => l.loginAt.startsWith(new Date().toISOString().split('T')[0])).length}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">Logins na data de hoje</span>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+              <span className="text-slate-500 text-xs block font-medium">Último Acesso</span>
+              <span className="text-sm font-bold text-slate-900 truncate mt-1.5 block">
+                {loginLogs[0]?.name || 'Nenhum login ainda'}
+              </span>
+              <span className="text-[10.5px] text-slate-500 font-mono block">
+                {loginLogs[0]?.loginAt
+                  ? new Date(loginLogs[0].loginAt).toLocaleString('pt-BR')
+                  : '-'}
+              </span>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+            {/* Filter and Search Bar */}
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/70">
+              <div className="relative w-full sm:w-80">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={loginSearch}
+                  onChange={(e) => setLoginSearch(e.target.value)}
+                  placeholder="Buscar por usuário, nome ou dispositivo..."
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-700/20 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-slate-400" />
+                  Perfil:
+                </span>
+                <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-300 text-xs font-semibold">
+                  {(['ALL', 'ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA'] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setLoginRoleFilter(r)}
+                      className={`px-2.5 py-1 rounded-md transition-all cursor-pointer text-[11px] ${
+                        loginRoleFilter === r
+                          ? 'bg-purple-700 text-white font-bold shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {r === 'ALL'
+                        ? 'Todos'
+                        : r === 'DIRETORIA_EXECUTIVA'
+                        ? 'Diretoria Executiva'
+                        : r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Table */}
+            {filteredLoginLogs.length === 0 ? (
+              <div className="p-12 text-center text-slate-500 text-xs space-y-2">
+                <History className="w-10 h-10 text-slate-300 mx-auto" />
+                <p className="font-bold text-slate-700">Nenhum registro de acesso encontrado.</p>
+                <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                  Os acessos são registrados automaticamente a cada login feito no aplicativo. Caso os logins tenham sido feitos em outros computadores, clique no botão <strong>"Atualizar da Nuvem"</strong> para sincronizar.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100/90 text-slate-600 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Usuário</th>
+                      <th className="py-3 px-4">Perfil</th>
+                      <th className="py-3 px-4">Data e Horário</th>
+                      <th className="py-3 px-4">Dispositivo / Ambiente</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {filteredLoginLogs.map((log) => {
+                      const isCurrentUser = currentUser?.username.toLowerCase() === log.username.toLowerCase();
+                      const dateObj = new Date(log.loginAt);
+                      const formattedDate = dateObj.toLocaleDateString('pt-BR');
+                      const formattedTime = dateObj.toLocaleTimeString('pt-BR');
+
+                      return (
+                        <tr key={log.id} className="hover:bg-slate-50/90 transition-colors">
+                          {/* Usuário */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-800 font-bold flex items-center justify-center shrink-0 border border-purple-200 text-xs">
+                                {log.name ? log.name.charAt(0).toUpperCase() : 'U'}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                  <span>{log.name}</span>
+                                  {isCurrentUser && (
+                                    <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1.5 py-0.2 rounded border border-purple-300">
+                                      Você
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] text-slate-500 font-mono">
+                                  @{log.username}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Perfil */}
+                          <td className="py-3 px-4">
+                            <span
+                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                log.role === 'ADMIN'
+                                  ? 'bg-purple-50 text-purple-900 border-purple-200'
+                                  : log.role === 'GERENCIAL'
+                                  ? 'bg-blue-50 text-blue-900 border-blue-200'
+                                  : log.role === 'DIRETORIA_EXECUTIVA'
+                                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 font-black'
+                                  : 'bg-amber-50 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              {log.role === 'DIRETORIA_EXECUTIVA' ? (
+                                <Smartphone className="w-2.5 h-2.5 text-emerald-700" />
+                              ) : (
+                                <Shield className="w-2.5 h-2.5" />
+                              )}
+                              {log.role === 'DIRETORIA_EXECUTIVA' ? 'DIRETORIA EXECUTIVA' : log.role}
+                            </span>
+                          </td>
+
+                          {/* Data e Horário */}
+                          <td className="py-3 px-4">
+                            <div className="font-mono font-bold text-slate-900 flex items-center gap-1.5">
+                              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              <span>{formattedDate}</span>
+                              <span className="text-slate-400 font-normal">às</span>
+                              <span className="text-purple-900">{formattedTime}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                              ID: {log.id}
+                            </div>
+                          </td>
+
+                          {/* Dispositivo / Navegador */}
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-1.5 text-slate-700">
+                              {log.deviceInfo?.toLowerCase().includes('android') || log.deviceInfo?.toLowerCase().includes('ios') ? (
+                                <Smartphone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              ) : (
+                                <Monitor className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                              )}
+                              <span className="truncate max-w-[240px] font-mono text-[11px]">
+                                {log.deviceInfo || 'Navegador Web'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Autorizado
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Card Informativo sobre a Sincronização em Nuvem */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <Database className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-xs font-bold text-slate-900 block">
+                    Como funciona o registro em nuvem no Supabase:
+                  </strong>
+                  <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                    Sempre que um usuário entra com seu login e senha em qualquer computador, o aplicativo envia imediatamente o registro com data, horário e dispositivo para a tabela remota <code className="font-bold text-slate-800">public.login_history</code> no Supabase. Caso o banco ainda não tenha essa tabela criada, execute o comando abaixo no <strong>SQL Editor</strong> do seu Supabase:
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const sql = `CREATE TABLE IF NOT EXISTS public.login_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    username TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    device_info TEXT,
+    status TEXT DEFAULT 'SUCESSO',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_login_history_login_at ON public.login_history(login_at DESC);
+ALTER TABLE public.login_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Acesso completo login_history para anon" ON public.login_history;
+CREATE POLICY "Acesso completo login_history para anon" ON public.login_history FOR ALL USING (true) WITH CHECK (true);`;
+                  navigator.clipboard.writeText(sql);
+                  setCopiedLoginSql(true);
+                  setTimeout(() => setCopiedLoginSql(false), 3000);
+                  showFeedback('SQL da tabela login_history copiado!', 'success');
+                }}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Copy className="w-3 h-3" />
+                {copiedLoginSql ? 'Copiado!' : 'Copiar SQL login_history'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: BANCO DE DADOS SUPABASE */}
       {activeTab === 'database' && (
         <div className="space-y-6">
           {/* Card 1: Baixar Planilha Consolidada */}

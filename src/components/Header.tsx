@@ -55,15 +55,20 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">
-                BH FOODS • LINHA INDUSTRIAL DE DESOSSA
-              </span>
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 px-2 py-0.5 rounded-lg bg-white border border-slate-200 shadow-2xs hidden sm:flex items-center justify-center">
+              <img src="/bh_foods_logo.png" alt="BH Foods" className="h-6 w-auto object-contain" />
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
-              Painel de Indicadores & Rentabilidade
-            </h2>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">
+                  BH FOODS • LINHA INDUSTRIAL DE DESOSSA
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">
+                Painel de Indicadores & Rentabilidade
+              </h2>
+            </div>
           </div>
         </div>
 

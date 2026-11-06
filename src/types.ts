@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'GERENCIAL' | 'DIRETORIA';
+export type UserRole = 'ADMIN' | 'GERENCIAL' | 'DIRETORIA' | 'DIRETORIA_EXECUTIVA';
 
 export interface User {
   id: string;
@@ -9,6 +9,17 @@ export interface User {
   role: UserRole;
   avatar?: string;
   shift?: string;
+}
+
+export interface LoginLog {
+  id: string;
+  userId?: string;
+  username: string;
+  name: string;
+  role: UserRole;
+  loginAt: string; // ISO string
+  deviceInfo?: string; // Navegador / Sistema operacional
+  status?: 'SUCESSO' | 'BLOQUEADO' | 'SENHA_INVALIDA';
 }
 
 export type CutType = 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA';
@@ -99,6 +110,11 @@ export interface ProductionRecord {
   profitMarginPct: number; // (Margem / Valor PA) * 100
   
   notes?: string;
+
+  // Auditoria de Upload (ATAK)
+  uploadedBy?: string; // Nome do usuário que realizou o upload
+  uploadedByUsername?: string; // Login do usuário
+  uploadedAt?: string; // Data e horário ISO do upload
 }
 
 export interface MarketBenchmark {

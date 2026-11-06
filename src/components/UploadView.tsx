@@ -201,7 +201,15 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
     setSuccessMsg('Processando e gravando lote na base de dados...');
 
     try {
-      const result = await addRecord(parsedPreview);
+      const nowIso = new Date().toISOString();
+      const recordToSave: ProductionRecord = {
+        ...parsedPreview,
+        uploadedBy: currentUser?.name || 'Administrador',
+        uploadedByUsername: currentUser?.username || 'admin',
+        uploadedAt: nowIso,
+      };
+
+      const result = await addRecord(recordToSave);
       setIsSubmitting(false);
 
       if (result.supabaseSynced) {
@@ -735,9 +743,16 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSuccessUpload, onNavig
                 </div>
 
                 <div className="mt-3 text-xs text-slate-600 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-2 border-t border-emerald-100">
-                  <span>
-                    Detalhamento: <strong>{parsedPreview.cuts.length} cortes individuais</strong> identificados
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>
+                      Detalhamento: <strong>{parsedPreview.cuts.length} cortes individuais</strong> identificados
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-slate-900 text-white px-2.5 py-0.5 rounded-full font-medium">
+                      <span>Upload por:</span>
+                      <strong className="text-emerald-400">{currentUser?.name || 'Administrador'}</strong>
+                      <span className="text-slate-300">({currentUser?.username || 'admin'})</span>
+                    </span>
+                  </div>
                   <span className="font-medium text-slate-500">
                     {parsedPreview.notes}
                   </span>

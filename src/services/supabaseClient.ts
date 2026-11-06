@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ProductionRecord, User, MarketBenchmark } from '../types';
+import { ProductionRecord, User, MarketBenchmark, LoginLog } from '../types';
 import { exportMasterDatabaseToExcel } from '../utils/excelDatabase';
 
 const STORAGE_KEY_SUPABASE_URL = 'frigo_supabase_custom_url_v1';
@@ -345,10 +345,25 @@ export async function syncRecordsToSupabase(records: ProductionRecord[]): Promis
         profit_margin_pct: num(r.profitMarginPct),
         notes: r.notes || '',
         cuts: cutsArray,
+        uploaded_by: r.uploadedBy || null,
+        uploaded_by_username: r.uploadedByUsername || null,
+        uploaded_at: r.uploadedAt || null,
       };
     });
 
-    const { error } = await client.from('production_records').upsert(rows, { onConflict: 'id' });
+    let { error } = await client.from('production_records').upsert(rows, { onConflict: 'id' });
+
+    // Fallback if the Supabase table doesn't have uploaded_by column yet
+    if (error && (error.message?.includes('uploaded_by') || (error.details && error.details.includes('uploaded_by')))) {
+      console.warn('Coluna uploaded_by ainda não criada no Supabase. Gravando sem campos de auditoria...');
+      const fallbackRows = rows.map((r: any) => {
+        const { uploaded_by, uploaded_by_username, uploaded_at, ...rest } = r;
+        return rest;
+      });
+      const fallbackRes = await client.from('production_records').upsert(fallbackRows, { onConflict: 'id' });
+      error = fallbackRes.error;
+    }
+
     if (error) {
       // Check if error is due to check constraint production_records_type_check (e.g. only DT and TR allowed in existing table)
       if (
@@ -559,6 +574,9 @@ export async function fetchRecordsFromSupabase(): Promise<{ success: boolean; da
       profitMarginPct: Number(d.profit_margin_pct),
       notes: d.notes,
       cuts: d.cuts || [],
+      uploadedBy: d.uploaded_by || undefined,
+      uploadedByUsername: d.uploaded_by_username || undefined,
+      uploadedAt: d.uploaded_at || undefined,
     }));
 
     return {
@@ -704,6 +722,146 @@ export async function fetchUsersFromSupabase(): Promise<{ success: boolean; data
 }
 
 /**
+ * Registra um evento de login de usuário na tabela 'login_history' do Supabase.
+ * Executa de forma resiliente para que nenhum login seja impedido caso a tabela ainda não exista.
+ */
+export async function recordLoginInSupabase(log: LoginLog): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase não configurado.' };
+  }
+
+  try {
+    const row = {
+      id: log.id,
+      user_id: log.userId || null,
+      username: log.username.toLowerCase().trim(),
+      name: log.name.trim(),
+      role: log.role,
+      login_at: log.loginAt || new Date().toISOString(),
+      device_info: log.deviceInfo || 'Navegador Web',
+      status: log.status || 'SUCESSO',
+    };
+
+    const { error } = await client.from('login_history').insert([row]);
+    if (error) {
+      console.warn('Aviso ao gravar histórico de login no Supabase:', error.message);
+      return { success: false, message: error.message };
+    }
+
+    return { success: true, message: 'Acesso registrado com sucesso no Supabase!' };
+  } catch (err: any) {
+    console.warn('Exceção ao registrar login no Supabase:', err);
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * Busca o histórico de acessos/logins gravados na tabela 'login_history' do Supabase.
+ */
+export async function fetchLoginLogsFromSupabase(): Promise<{ success: boolean; data?: LoginLog[]; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase não configurado.' };
+  }
+
+  try {
+    const { data, error } = await client
+      .from('login_history')
+      .select('*')
+      .order('login_at', { ascending: false })
+      .limit(500);
+
+    if (error) {
+      if (error.code === '42P01' || error.message.includes('relation "public.login_history" does not exist')) {
+        return {
+          success: false,
+          message: 'Tabela login_history ainda não criada no Supabase. Execute o script SQL no painel de administração.',
+        };
+      }
+      throw error;
+    }
+
+    const logs: LoginLog[] = (data || []).map((d: any) => ({
+      id: d.id,
+      userId: d.user_id,
+      username: d.username,
+      name: d.name,
+      role: d.role,
+      loginAt: d.login_at,
+      deviceInfo: d.device_info,
+      status: d.status || 'SUCESSO',
+    }));
+
+    return {
+      success: true,
+      data: logs,
+      message: `${logs.length} registro(s) de login carregado(s) do Supabase!`,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Erro ao consultar histórico de logins no Supabase: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Sincroniza em lote uma lista de acessos locais para o Supabase (para garantir que registros offline subam).
+ */
+export async function syncLoginLogsToSupabase(logs: LoginLog[]): Promise<{ success: boolean; message: string; count?: number }> {
+  const client = getSupabaseClient();
+  if (!client || logs.length === 0) {
+    return { success: false, message: 'Nenhum log ou Supabase desconectado.' };
+  }
+
+  try {
+    const rows = logs.map((l) => ({
+      id: l.id,
+      user_id: l.userId || null,
+      username: l.username.toLowerCase().trim(),
+      name: l.name.trim(),
+      role: l.role,
+      login_at: l.loginAt,
+      device_info: l.deviceInfo || 'Navegador Web',
+      status: l.status || 'SUCESSO',
+    }));
+
+    const { error } = await client.from('login_history').upsert(rows, { onConflict: 'id' });
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: `${rows.length} registro(s) de login sincronizado(s) no Supabase!`,
+      count: rows.length,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Erro ao sincronizar logins no Supabase: ${err.message}`,
+    };
+  }
+}
+
+/**
+ * Limpa o histórico de logins no Supabase (restrito ao Admin).
+ */
+export async function clearLoginLogsInSupabase(): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, message: 'Supabase não configurado.' };
+  }
+
+  try {
+    const { error } = await client.from('login_history').delete().neq('id', '___safe_keep___');
+    if (error) throw error;
+    return { success: true, message: 'Histórico de acessos limpo no Supabase com sucesso.' };
+  } catch (err: any) {
+    return { success: false, message: `Erro ao limpar histórico no Supabase: ${err.message}` };
+  }
+}
+
+/**
  * Master download function: Exports all current database records & cuts into an Excel spreadsheet.
  */
 export function downloadDatabaseSpreadsheet(records: ProductionRecord[], benchmarks: MarketBenchmark[] = []) {
@@ -725,6 +883,11 @@ ALTER TABLE public.production_records ADD CONSTRAINT production_records_type_che
     CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));
 
 ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+
+-- Auditoria de Upload (Quem fez o upload do ATAK e quando)
+ALTER TABLE public.production_records ADD COLUMN IF NOT EXISTS uploaded_by TEXT;
+ALTER TABLE public.production_records ADD COLUMN IF NOT EXISTS uploaded_by_username TEXT;
+ALTER TABLE public.production_records ADD COLUMN IF NOT EXISTS uploaded_at TEXT;
 
 -- 1. Tabela de Lotes e Desempenho da Desossa (com tipos numéricos flexíveis para evitar estouro de precisão)
 CREATE TABLE IF NOT EXISTS public.production_records (
@@ -765,6 +928,9 @@ CREATE TABLE IF NOT EXISTS public.production_records (
     profit_margin_pct NUMERIC DEFAULT 0,
     notes TEXT,
     cuts JSONB DEFAULT '[]'::jsonb,
+    uploaded_by TEXT,
+    uploaded_by_username TEXT,
+    uploaded_at TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -801,20 +967,47 @@ CREATE TABLE IF NOT EXISTS public.app_users (
     username TEXT UNIQUE NOT NULL,
     email TEXT,
     password TEXT NOT NULL,
-    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA')),
+    role TEXT NOT NULL CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Atualização segura da constraint caso a tabela já existisse
+DO $$
+BEGIN
+    ALTER TABLE public.app_users DROP CONSTRAINT IF EXISTS app_users_role_check;
+    ALTER TABLE public.app_users ADD CONSTRAINT app_users_role_check CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA'));
+EXCEPTION
+    WHEN OTHERS THEN NULL;
+END $$;
+
 -- Inserção segura dos usuários padrão sem sobrescrever senhas existentes
 INSERT INTO public.app_users (id, name, username, email, password, role)
 VALUES 
-    ('usr_admin', 'Administrador Geral', 'admin', 'admin@frigorifico.com.br', 'admin123', 'ADMIN')
+    ('usr_admin', 'Administrador Geral', 'admin', 'admin@frigorifico.com.br', 'admin123', 'ADMIN'),
+    ('usr_diretoria', 'Diretoria Executiva', 'diretoria', 'diretoria@frigorifico.com.br', 'diretoria2026', 'DIRETORIA_EXECUTIVA')
 ON CONFLICT (username) DO NOTHING;
 
--- 3. Habilita RLS (Row Level Security) com políticas idempotentes (pode ser executado múltiplas vezes)
+-- 3. Tabela de Histórico de Logins & Auditoria de Acessos
+CREATE TABLE IF NOT EXISTS public.login_history (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    username TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    login_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    device_info TEXT,
+    status TEXT DEFAULT 'SUCESSO',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_history_login_at ON public.login_history(login_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_history_username ON public.login_history(username);
+
+-- 4. Habilita RLS (Row Level Security) com políticas idempotentes (pode ser executado múltiplas vezes)
 ALTER TABLE public.production_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.login_history ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Acesso completo produção para anon" ON public.production_records;
 CREATE POLICY "Acesso completo produção para anon" ON public.production_records
@@ -824,6 +1017,12 @@ CREATE POLICY "Acesso completo produção para anon" ON public.production_record
 
 DROP POLICY IF EXISTS "Acesso completo usuários para anon" ON public.app_users;
 CREATE POLICY "Acesso completo usuários para anon" ON public.app_users
+    FOR ALL
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Acesso completo login_history para anon" ON public.login_history;
+CREATE POLICY "Acesso completo login_history para anon" ON public.login_history
     FOR ALL
     USING (true)
     WITH CHECK (true);
