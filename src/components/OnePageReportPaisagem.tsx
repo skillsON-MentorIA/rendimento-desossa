@@ -14,8 +14,12 @@ import {
   ChevronDown,
   Percent,
   Bone,
-  Flame
+  Flame,
+  Download,
+  Loader2
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { useApp } from '../context/AppContext';
 import { ProductionRecord, CutType } from '../types';
 import {
@@ -249,9 +253,54 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
     return rows;
   }, [monthRecords, generalSummary.entradaKg]);
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
   // Função para imprimir no formato paisagem
   const handlePrint = () => {
+    document.title = `OPR_MENSAL_BH_FOODS_${monthFormattedName.replace(/[^a-zA-Z0-9]/g, '_')}`;
     window.print();
+  };
+
+  // Função para fazer download direto do PDF oficial do OPR Mensal
+  const handleDownloadPDF = async () => {
+    const sheet = document.getElementById('opr-mensal-sheet');
+    if (!sheet) {
+      window.print();
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const canvas = await html2canvas(sheet, {
+        scale: 2, // 2x para nitidez cristalina
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1440,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.96);
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pdfWidth = 297;
+      const pdfHeight = 210;
+      const margin = 3.5;
+      const renderWidth = pdfWidth - margin * 2;
+      const renderHeight = (canvas.height * renderWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'JPEG', margin, margin, renderWidth, Math.min(renderHeight, pdfHeight - margin * 2));
+      const cleanMonth = monthFormattedName.replace(/[^a-zA-Z0-9]/g, '_');
+      pdf.save(`OPR_MENSAL_BH_FOODS_${cleanMonth}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF para download:', err);
+      window.print();
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
@@ -261,8 +310,8 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
         dangerouslySetInnerHTML={{
           __html: `
             @page {
-              size: A4 landscape;
-              margin: 4.5mm;
+              size: A4 landscape !important;
+              margin: 4mm !important;
             }
             @media print {
               html, body, #root, .min-h-screen, main {
@@ -273,6 +322,8 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
                 print-color-adjust: exact !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                width: 100% !important;
+                overflow: visible !important;
               }
               .one-page-landscape-sheet {
                 box-shadow: none !important;
@@ -280,16 +331,21 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
                 border-radius: 0px !important;
                 width: 100% !important;
                 max-width: 100% !important;
-                height: 100% !important;
-                max-height: 200mm !important;
+                height: auto !important;
+                min-height: auto !important;
                 margin: 0 auto !important;
-                padding: 3.5mm 4.5mm !important;
+                padding: 3mm 4mm !important;
                 box-sizing: border-box !important;
-                overflow: hidden !important;
+                overflow: visible !important;
                 background: #ffffff !important;
                 page-break-after: avoid !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+              }
+              .print-grid-2 {
+                display: grid !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 8px !important;
               }
             }
           `
@@ -341,15 +397,31 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
             </select>
           </div>
 
-          {/* Botão de Imprimir / PDF */}
+          {/* Botão de Download Direto em PDF */}
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/20 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 disabled:opacity-75"
+            title="Baixar arquivo PDF do relatório no formato Paisagem A4"
+          >
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>{isDownloading ? 'Gerando PDF...' : 'Baixar PDF'}</span>
+          </button>
+
+          {/* Botão de Imprimir */}
           <button
             type="button"
             onClick={handlePrint}
-            className="px-3.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/20 flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95"
             title="Imprimir ou salvar em PDF na orientação paisagem"
           >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir / Salvar PDF</span>
+            <Printer className="w-4 h-4 text-emerald-400" />
+            <span>Imprimir</span>
           </button>
 
           {/* Links rápidos para outras visões */}
@@ -380,7 +452,7 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
       {/* =========================================================================
           FOLHA OFICIAL ONE PAGE REPORT MENSAL (1 PÁGINA A4 PAISAGEM)
          ========================================================================= */}
-      <div className="max-w-[1440px] mx-auto bg-white rounded-2xl shadow-xl border border-slate-300 p-4 one-page-landscape-sheet flex flex-col justify-between">
+      <div id="opr-mensal-sheet" className="max-w-[1440px] mx-auto bg-white rounded-2xl shadow-xl border border-slate-300 p-4 one-page-landscape-sheet flex flex-col justify-between">
         
         {/* 1) CABEÇALHO CORPORATIVO BH FOODS (MANTIDO) */}
         <header className="border-b-2 border-slate-800 pb-2 mb-2 flex items-center justify-between gap-4">
@@ -619,9 +691,9 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 print-grid-2 gap-3 items-stretch">
             {/* Tabela de 4 colunas estritas */}
-            <div className="lg:col-span-6 overflow-hidden border border-slate-300 rounded-xl shadow-2xs flex flex-col justify-between bg-white">
+            <div className="col-span-1 print:col-span-1 overflow-hidden border border-slate-300 rounded-xl shadow-2xs flex flex-col justify-between bg-white">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white font-black uppercase tracking-wider text-[9px]">
@@ -671,7 +743,7 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
             </div>
 
             {/* Painel Lateral: BALANÇO DE MASSA & SUB PRODUTOS (CONFORME SOLICITADO NO ANEXO) */}
-            <div className="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between shadow-2xs">
+            <div className="col-span-1 print:col-span-1 bg-white border border-slate-300 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between shadow-2xs">
               {/* Cabeçalho do Balanço de Massa */}
               <div className="flex items-start justify-between pb-1.5 border-b border-slate-100">
                 <div>

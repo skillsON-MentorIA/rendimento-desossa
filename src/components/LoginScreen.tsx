@@ -38,8 +38,8 @@ export const LoginScreen: React.FC = () => {
     try {
       const res = await authenticateWithFaceBiometrics();
       if (res.success && res.username) {
-        // Realiza o login direto do usuário autorizado
-        const loginRes = await login(res.username);
+        // Realiza o login direto do usuário autorizado via biometria com isBiometricVerified = true
+        const loginRes = await login(res.username, undefined, true);
         if (!loginRes.success) {
           setError(loginRes.message || 'Falha ao autenticar biometria.');
         }

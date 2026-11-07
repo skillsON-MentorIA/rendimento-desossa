@@ -67,7 +67,7 @@ interface AppContextType {
   carcassCosts: { DIANTEIRO: number; TRASEIRO: number; SUINO: number; COSTELA: number };
   updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA', newCost: number) => void;
   resetToDemoData: () => void;
-  login: (username: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  login: (username: string, password?: string, isBiometricVerified?: boolean) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   canEdit: boolean;
   canUpload: boolean;
@@ -762,7 +762,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, supabaseSync: syncRes };
   };
 
-  const login = async (username: string, password?: string): Promise<{ success: boolean; message?: string }> => {
+  const login = async (username: string, password?: string, isBiometricVerified = false): Promise<{ success: boolean; message?: string }> => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password?.trim() || '';
 
@@ -826,11 +826,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
 
-    if (user.password && !verifyPassword(cleanPass, user.password)) {
-      return {
-        success: false,
-        message: 'Senha incorreta para este usuário.',
-      };
+    // Se a autenticação foi feita por biometria / Face ID previamente confirmada no hardware do celular, pula a verificação de senha
+    if (!isBiometricVerified) {
+      if (user.password && !verifyPassword(cleanPass, user.password)) {
+        return {
+          success: false,
+          message: 'Senha incorreta para este usuário.',
+        };
+      }
     }
 
     setCurrentUser(user);

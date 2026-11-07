@@ -21,7 +21,6 @@ html, body {
 
 @media print {
   @page {
-    size: A4 portrait;
     margin: 4mm;
   }
   html, body, #root, .min-h-screen, main, .print-page-wrapper {
