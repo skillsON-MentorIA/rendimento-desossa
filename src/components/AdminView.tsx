@@ -630,7 +630,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                 Usuários do Sistema e Níveis de Permissão
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Defina quem tem acesso ao sistema com senhas individuais e atribua o perfil correspondente: <strong>ADMIN</strong>, <strong>GERENCIAL</strong> ou <strong>DIRETORIA</strong>.
+                Defina quem tem acesso ao sistema com senhas individuais e atribua o perfil correspondente: <strong>ADMIN</strong>, <strong>GERENCIAL</strong>, <strong>DIRETORIA</strong> ou <strong>DIRETORIA EXECUTIVA (MOBILE)</strong>.
               </p>
             </div>
 
@@ -654,6 +654,33 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
                 {isAddUserOpen ? 'Fechar Formulário' : '+ Novo Usuário'}
               </button>
             </div>
+          </div>
+
+          {/* Banner de Compatibilização do Supabase para Diretoria Executiva */}
+          <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start gap-2.5 text-amber-950">
+              <Shield className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-bold text-amber-950 block">
+                  Comando SQL para liberar 'DIRETORIA_EXECUTIVA' no Supabase:
+                </strong>
+                <span className="text-[11px] text-amber-800">
+                  Caso seu Supabase apresente o erro <code className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-950">app_users_role_check</code>, basta copiar e rodar este comando rápido no <strong>SQL Editor</strong> do Supabase.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const roleSql = `ALTER TABLE public.app_users DROP CONSTRAINT IF EXISTS app_users_role_check;\nALTER TABLE public.app_users ADD CONSTRAINT app_users_role_check CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA'));`;
+                navigator.clipboard.writeText(roleSql);
+                showFeedback('Comando SQL para liberar DIRETORIA_EXECUTIVA copiado com sucesso!', 'success');
+              }}
+              className="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-lg font-bold text-[11px] shrink-0 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>Copiar Comando SQL</span>
+            </button>
           </div>
 
           {/* New User Form Drawer */}
@@ -1634,17 +1661,17 @@ CREATE POLICY "Acesso completo login_history para anon" ON public.login_history 
                   <Database className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
                   <div>
                     <strong className="text-xs text-sky-950 block font-bold">
-                      Ajuste de Restrições no Supabase (Liberar Suíno e Costela)
+                      Ajuste de Restrições no Supabase (Liberar Suíno, Costela e Diretoria Executiva)
                     </strong>
                     <p className="mt-0.5 text-[11px] text-slate-700 leading-relaxed">
-                      Para autorizar lotes de <strong>Suíno</strong> e <strong>Costela</strong> no banco da nuvem e compatibilizar a tabela de usuários, execute este comando no <strong>SQL Editor</strong> do Supabase:
+                      Para autorizar lotes de <strong>Suíno</strong>, <strong>Costela</strong> e perfis de <strong>Diretoria Executiva</strong> no banco da nuvem, execute este comando no <strong>SQL Editor</strong> do Supabase:
                     </p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    const fixSql = `ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;\nALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));\nALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();`;
+                    const fixSql = `ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;\nALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));\nALTER TABLE public.app_users DROP CONSTRAINT IF EXISTS app_users_role_check;\nALTER TABLE public.app_users ADD CONSTRAINT app_users_role_check CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA'));\nALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();`;
                     navigator.clipboard.writeText(fixSql);
                     setCopiedTypeFixSql(true);
                     setTimeout(() => setCopiedTypeFixSql(false), 3000);
@@ -1661,6 +1688,8 @@ CREATE POLICY "Acesso completo login_history para anon" ON public.login_history 
                 <code>
                   ALTER TABLE public.production_records DROP CONSTRAINT IF EXISTS production_records_type_check;<br/>
                   ALTER TABLE public.production_records ADD CONSTRAINT production_records_type_check CHECK (type IN ('DIANTEIRO', 'TRASEIRO', 'SUINO', 'COSTELA'));<br/>
+                  ALTER TABLE public.app_users DROP CONSTRAINT IF EXISTS app_users_role_check;<br/>
+                  ALTER TABLE public.app_users ADD CONSTRAINT app_users_role_check CHECK (role IN ('ADMIN', 'GERENCIAL', 'DIRETORIA', 'DIRETORIA_EXECUTIVA'));<br/>
                   ALTER TABLE public.app_users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
                 </code>
               </div>

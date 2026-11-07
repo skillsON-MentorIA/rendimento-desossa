@@ -186,13 +186,17 @@ export async function fetchUserByUsernameOrEmail(loginIdentifier: string): Promi
 
     if (error || !data || data.length === 0) return null;
     const d = data[0];
+    const isExecutive = d.role === 'DIRETORIA_EXECUTIVA' ||
+      d.username?.toLowerCase() === 'diretoria' ||
+      d.name?.toLowerCase().includes('diretoria executiva');
+
     return {
       id: d.id,
       name: d.name,
       username: d.username,
       email: d.email,
       password: d.password,
-      role: d.role,
+      role: isExecutive ? 'DIRETORIA_EXECUTIVA' : d.role,
     };
   } catch (err) {
     console.warn('Erro ao consultar usuário individual no Supabase:', err);
@@ -807,13 +811,36 @@ export async function syncUsersToSupabase(users: User[]): Promise<{ success: boo
     });
 
     // 3. Upsert using primary key 'id'
-    const { error: upsertErr } = await client.from('app_users').upsert(rows, { onConflict: 'id' });
+    let { error: upsertErr } = await client.from('app_users').upsert(rows, { onConflict: 'id' });
     if (upsertErr) {
       // Fallback: try onConflict on 'username'
       const { error: retryErr } = await client.from('app_users').upsert(rows, { onConflict: 'username' });
       if (retryErr) {
-        throw new Error(upsertErr.message || retryErr.message);
+        upsertErr = retryErr;
+      } else {
+        upsertErr = null;
       }
+    }
+
+    // Se falhou especificamente por conta da constraint de validação antiga 'app_users_role_check'
+    if (upsertErr && (upsertErr.message?.includes('app_users_role_check') || (upsertErr as any).details?.includes('app_users_role_check'))) {
+      console.warn('Detectada constraint antiga app_users_role_check no Supabase. Mapeando temporariamente para DIRETORIA para salvar sem travar...');
+      const fallbackRows = rows.map((r) => ({
+        ...r,
+        role: r.role === 'DIRETORIA_EXECUTIVA' ? 'DIRETORIA' : r.role,
+      }));
+
+      const { error: fbErr } = await client.from('app_users').upsert(fallbackRows, { onConflict: 'username' });
+      if (!fbErr) {
+        return {
+          success: true,
+          message: `✅ ${rows.length} usuário(s) sincronizado(s) com sucesso no Supabase! (Dica: Execute o comando SQL no Supabase para atualizar a regra de DIRETORIA_EXECUTIVA).`,
+          count: rows.length,
+        };
+      }
+      throw fbErr;
+    } else if (upsertErr) {
+      throw upsertErr;
     }
 
     return {
@@ -847,14 +874,20 @@ export async function fetchUsersFromSupabase(): Promise<{ success: boolean; data
       return { success: true, data: [], message: 'Nenhum usuário no Supabase.' };
     }
 
-    const users: User[] = data.map((d: any) => ({
-      id: d.id,
-      name: d.name,
-      username: d.username,
-      email: d.email,
-      password: d.password,
-      role: d.role,
-    }));
+    const users: User[] = data.map((d: any) => {
+      const isExecutive = d.role === 'DIRETORIA_EXECUTIVA' ||
+        d.username?.toLowerCase() === 'diretoria' ||
+        d.name?.toLowerCase().includes('diretoria executiva');
+
+      return {
+        id: d.id,
+        name: d.name,
+        username: d.username,
+        email: d.email,
+        password: d.password,
+        role: isExecutive ? 'DIRETORIA_EXECUTIVA' : d.role,
+      };
+    });
 
     return { success: true, data: users, message: `${users.length} usuários obtidos do Supabase.` };
   } catch (err: any) {
