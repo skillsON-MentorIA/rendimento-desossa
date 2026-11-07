@@ -12,9 +12,60 @@ export interface SupabaseConfigInfo {
   source: 'env' | 'admin_settings' | 'none';
 }
 
+let serverSharedConfig: { url: string; anonKey: string } | null = null;
+
+/**
+ * Carrega a configuração compartilhada do Supabase armazenada no servidor ou em public/supabase-config.json
+ * Isso permite que computadores, celulares e tablets compartilhem automaticamente as credenciais do Supabase.
+ */
+export async function fetchServerSharedConfig(): Promise<SupabaseConfigInfo | null> {
+  try {
+    const res = await fetch('/api/supabase-config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.url && data.anonKey) {
+        serverSharedConfig = { url: data.url.trim(), anonKey: data.anonKey.trim() };
+        if (!localStorage.getItem(STORAGE_KEY_SUPABASE_URL)) {
+          localStorage.setItem(STORAGE_KEY_SUPABASE_URL, data.url.trim());
+          localStorage.setItem(STORAGE_KEY_SUPABASE_KEY, data.anonKey.trim());
+        }
+        return {
+          url: data.url.trim(),
+          anonKey: data.anonKey.trim(),
+          isConfigured: true,
+          source: 'admin_settings',
+        };
+      }
+    }
+  } catch (e) {
+    try {
+      const res2 = await fetch('/supabase-config.json');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2 && data2.url && data2.anonKey) {
+          serverSharedConfig = { url: data2.url.trim(), anonKey: data2.anonKey.trim() };
+          if (!localStorage.getItem(STORAGE_KEY_SUPABASE_URL)) {
+            localStorage.setItem(STORAGE_KEY_SUPABASE_URL, data2.url.trim());
+            localStorage.setItem(STORAGE_KEY_SUPABASE_KEY, data2.anonKey.trim());
+          }
+          return {
+            url: data2.url.trim(),
+            anonKey: data2.anonKey.trim(),
+            isConfigured: true,
+            source: 'admin_settings',
+          };
+        }
+      }
+    } catch {
+      // Ignora erro
+    }
+  }
+  return null;
+}
+
 /**
  * Returns current Supabase connection configuration:
- * Prioritizes Environment Variables (Netlify VITE_SUPABASE_URL), then Admin UI override.
+ * Prioritizes Environment Variables, then LocalStorage, then Server Shared Config, then Default.
  */
 export function getSupabaseConfig(): SupabaseConfigInfo {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
@@ -29,8 +80,8 @@ export function getSupabaseConfig(): SupabaseConfigInfo {
     };
   }
 
-  const customUrl = localStorage.getItem(STORAGE_KEY_SUPABASE_URL)?.trim() || '';
-  const customKey = localStorage.getItem(STORAGE_KEY_SUPABASE_KEY)?.trim() || '';
+  const customUrl = localStorage.getItem(STORAGE_KEY_SUPABASE_URL)?.trim() || serverSharedConfig?.url || '';
+  const customKey = localStorage.getItem(STORAGE_KEY_SUPABASE_KEY)?.trim() || serverSharedConfig?.anonKey || '';
 
   if (customUrl && customKey) {
     return {
@@ -42,21 +93,111 @@ export function getSupabaseConfig(): SupabaseConfigInfo {
   }
 
   return {
-    url: '',
-    anonKey: '',
-    isConfigured: false,
+    url: customUrl || 'https://pwxatscumudcppxnfgjv.supabase.co',
+    anonKey: customKey,
+    isConfigured: Boolean(customUrl && customKey),
     source: 'none',
   };
 }
 
-export function saveCustomSupabaseConfig(url: string, anonKey: string) {
-  localStorage.setItem(STORAGE_KEY_SUPABASE_URL, url.trim());
-  localStorage.setItem(STORAGE_KEY_SUPABASE_KEY, anonKey.trim());
+export async function saveCustomSupabaseConfig(url: string, anonKey: string): Promise<void> {
+  const cleanUrl = url.trim();
+  const cleanKey = anonKey.trim();
+  localStorage.setItem(STORAGE_KEY_SUPABASE_URL, cleanUrl);
+  localStorage.setItem(STORAGE_KEY_SUPABASE_KEY, cleanKey);
+  serverSharedConfig = { url: cleanUrl, anonKey: cleanKey };
+  cachedClient = null;
+
+  try {
+    await fetch('/api/supabase-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: cleanUrl,
+        anonKey: cleanKey,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+  } catch (err) {
+    console.warn('Aviso ao sincronizar configuração com o servidor:', err);
+  }
 }
 
 export function clearCustomSupabaseConfig() {
   localStorage.removeItem(STORAGE_KEY_SUPABASE_URL);
   localStorage.removeItem(STORAGE_KEY_SUPABASE_KEY);
+  serverSharedConfig = null;
+  cachedClient = null;
+}
+
+/**
+ * Salva a lista de usuários no armazenamento compartilhado do servidor
+ * para que celulares e computadores compartilhem instantaneamente os novos cadastros.
+ */
+export async function saveSharedUsersToServer(users: User[]): Promise<void> {
+  try {
+    await fetch('/api/shared-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(users),
+    });
+  } catch (err) {
+    console.warn('Aviso ao sincronizar usuários no servidor:', err);
+  }
+}
+
+/**
+ * Obtém os usuários sincronizados no servidor compartilhado.
+ */
+export async function fetchSharedUsersFromServer(): Promise<User[]> {
+  try {
+    const res = await fetch('/api/shared-users');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    try {
+      const res2 = await fetch('/app-users.json');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (Array.isArray(data2) && data2.length > 0) return data2;
+      }
+    } catch {}
+  }
+  return [];
+}
+
+/**
+ * Consulta um usuário diretamente no Supabase em tempo real pelo login ou email.
+ * Permite que um usuário recém-criado em outro dispositivo acerte o login no celular mesmo antes da sincronização total.
+ */
+export async function fetchUserByUsernameOrEmail(loginIdentifier: string): Promise<User | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  const clean = loginIdentifier.trim().toLowerCase();
+  try {
+    const { data, error } = await client
+      .from('app_users')
+      .select('*')
+      .or(`username.ilike.${clean},email.ilike.${clean}`)
+      .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+    const d = data[0];
+    return {
+      id: d.id,
+      name: d.name,
+      username: d.username,
+      email: d.email,
+      password: d.password,
+      role: d.role,
+    };
+  } catch (err) {
+    console.warn('Erro ao consultar usuário individual no Supabase:', err);
+    return null;
+  }
 }
 
 let cachedClient: SupabaseClient | null = null;

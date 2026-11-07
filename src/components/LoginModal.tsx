@@ -22,19 +22,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const res = login(username, password);
+    const res = await login(username, password);
     if (res.success) {
       onClose();
     } else {
-      setError(res.message || 'Usuário ou senha inválidos. Tente admin / admin123');
+      setError(res.message || 'Usuário ou senha inválidos.');
     }
   };
 
-  const handleQuickLogin = (u: string, p: string) => {
-    login(u, p);
+  const handleQuickLogin = async (u: string, p: string) => {
+    await login(u, p);
     onClose();
   };
 

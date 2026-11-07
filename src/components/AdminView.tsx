@@ -51,7 +51,9 @@ import {
   fetchRecordsFromSupabase,
   syncUsersToSupabase,
   getSupabaseSetupSQL,
-  downloadDatabaseSpreadsheet
+  downloadDatabaseSpreadsheet,
+  fetchServerSharedConfig,
+  saveSharedUsersToServer,
 } from '../services/supabaseClient';
 
 interface AdminViewProps {
@@ -140,7 +142,18 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   const [benchmarkFilter, setBenchmarkFilter] = useState<'ALL' | 'DIANTEIRO' | 'TRASEIRO' | 'COSTELA' | 'SUINO'>('ALL');
 
   useEffect(() => {
-    setSupabaseConfig(getSupabaseConfig());
+    fetchServerSharedConfig().then((cfg) => {
+      if (cfg && cfg.isConfigured) {
+        setSupabaseConfig(cfg);
+        setInputUrl(cfg.url);
+        setInputKey(cfg.anonKey);
+      } else {
+        const c = getSupabaseConfig();
+        setSupabaseConfig(c);
+        setInputUrl(c.url);
+        setInputKey(c.anonKey);
+      }
+    });
   }, []);
 
   const showFeedback = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -238,16 +251,17 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   };
 
   // Save manual Supabase credentials
-  const handleSaveSupabaseConfig = (e: React.FormEvent) => {
+  const handleSaveSupabaseConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputUrl.trim() || !inputKey.trim()) {
       showFeedback('Informe a URL do Supabase e a Anon Public Key.', 'error');
       return;
     }
 
-    saveCustomSupabaseConfig(inputUrl.trim(), inputKey.trim());
+    await saveCustomSupabaseConfig(inputUrl.trim(), inputKey.trim());
+    await saveSharedUsersToServer(users);
     setSupabaseConfig(getSupabaseConfig());
-    showFeedback('Credenciais do Supabase salvas localmente! Teste a conexão agora.');
+    showFeedback('Credenciais salvas e compartilhadas automaticamente com todos os celulares e computadores!', 'success');
     handleTestConnection();
   };
 
@@ -264,10 +278,11 @@ export const AdminView: React.FC<AdminViewProps> = ({ onNavigateToDashboard }) =
   // Sync users specifically to Supabase
   const handleSyncUsersOnly = async () => {
     setIsSyncing(true);
+    await saveSharedUsersToServer(users);
     const res = await syncUsersToSupabase(users);
     setIsSyncing(false);
     if (res.success) {
-      showFeedback(`✅ ${users.length} usuário(s) sincronizado(s) com sucesso no Supabase!`, 'success');
+      showFeedback(`✅ ${users.length} usuário(s) sincronizado(s) no Supabase e compartilhados com o celular!`, 'success');
     } else {
       showFeedback(res.message || 'Erro ao sincronizar usuários com o Supabase.', 'error');
     }
@@ -1696,16 +1711,16 @@ CREATE POLICY "Acesso completo login_history para anon" ON public.login_history 
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-500">
-                  Dica: Para deploy no Netlify, você também pode inserir essas chaves nas variáveis de ambiente do Netlify.
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-emerald-800 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <span>📱</span> Sincronização Ativa: As credenciais salvas aqui são propagadas para o celular e outros dispositivos.
                 </span>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Salvar Credenciais
+                  Salvar e Compartilhar Credenciais
                 </button>
               </div>
             </form>

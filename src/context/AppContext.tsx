@@ -21,6 +21,10 @@ import {
   recordLoginInSupabase,
   fetchLoginLogsFromSupabase,
   clearLoginLogsInSupabase,
+  fetchServerSharedConfig,
+  saveSharedUsersToServer,
+  fetchSharedUsersFromServer,
+  fetchUserByUsernameOrEmail,
 } from '../services/supabaseClient';
 
 interface AppContextType {
@@ -63,7 +67,7 @@ interface AppContextType {
   carcassCosts: { DIANTEIRO: number; TRASEIRO: number; SUINO: number; COSTELA: number };
   updateCarcassCost: (type: 'DIANTEIRO' | 'TRASEIRO' | 'SUINO' | 'COSTELA', newCost: number) => void;
   resetToDemoData: () => void;
-  login: (username: string, password?: string) => { success: boolean; message?: string };
+  login: (username: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   canEdit: boolean;
   canUpload: boolean;
@@ -527,15 +531,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [lastExportDate]);
 
-  // Sincronização automática com o Supabase na inicialização do aplicativo
-  // Permite que qualquer usuário acessando pelo Netlify em outro dispositivo receba os dados reais
+  // Sincronização automática com o Supabase e servidor compartilhado na inicialização do aplicativo
+  // Garante que qualquer dispositivo móvel (celular) ou computador receba os mesmos usuários e dados reais
   useEffect(() => {
+    let isMounted = true;
+
+    // 1. Carrega configuração compartilhada do Supabase armazenada no servidor
+    fetchServerSharedConfig()
+      .then((cfg) => {
+        if (!isMounted) return;
+        if (cfg && cfg.isConfigured) {
+          fetchUsersFromSupabase().then((res) => {
+            if (isMounted && res.success && res.data && res.data.length > 0) {
+              setUsers((prevLocal) => {
+                const map = new Map<string, User>();
+                prevLocal.forEach((u) => map.set(u.username.toLowerCase(), u));
+                res.data!.forEach((u) => {
+                  map.set(u.username.toLowerCase(), {
+                    ...u,
+                    password: encryptPassword(u.password || 'admin123'),
+                  });
+                });
+                const merged = Array.from(map.values());
+                saveSharedUsersToServer(merged).catch(() => {});
+                return merged;
+              });
+            }
+          }).catch((err) => console.warn('Erro ao carregar usuários do Supabase:', err));
+
+          fetchRecordsFromSupabase().then((res) => {
+            if (isMounted && res.success && res.data && res.data.length > 0) {
+              const sanitizedRemote = res.data.map((p) => sanitizeProductionRecord(p, 9.30));
+              setRecords((prev) => {
+                const isOnlyInitialDemo = prev.length <= 4 && prev.every((r) =>
+                  r.id.startsWith('rec_dt_2026') ||
+                  r.id.startsWith('rec_ds_2026') ||
+                  r.id.startsWith('rec_tr_2026') ||
+                  r.id.startsWith('rec_ct_2026')
+                );
+                if (isOnlyInitialDemo) return sanitizedRemote;
+                const map = new Map<string, ProductionRecord>();
+                prev.forEach((r) => map.set(r.id, r));
+                sanitizedRemote.forEach((r) => map.set(r.id, r));
+                return Array.from(map.values()).sort((a, b) => b.date.localeCompare(a.date));
+              });
+            }
+          }).catch((err) => console.warn('Erro ao carregar registros do Supabase:', err));
+        }
+      })
+      .catch((err) => console.warn('Aviso na verificação de configuração compartilhada:', err));
+
+    // 2. Carrega usuários do servidor compartilhado (para quando Supabase ainda não estiver configurado)
+    fetchSharedUsersFromServer()
+      .then((shared) => {
+        if (isMounted && shared && shared.length > 0) {
+          setUsers((prevLocal) => {
+            const map = new Map<string, User>();
+            prevLocal.forEach((u) => map.set(u.username.toLowerCase(), u));
+            shared.forEach((u) => {
+              if (!map.has(u.username.toLowerCase())) {
+                map.set(u.username.toLowerCase(), {
+                  ...u,
+                  password: encryptPassword(u.password || 'admin123'),
+                });
+              }
+            });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch(() => {});
+
+    // 3. Se Supabase já estiver configurado no localStorage local:
     const config = getSupabaseConfig();
     if (!config.isConfigured) return;
 
-    let isMounted = true;
-
-    // Buscar usuários cadastrados no Supabase para permitir login em qualquer dispositivo
     fetchUsersFromSupabase()
       .then((res) => {
         if (isMounted && res.success && res.data && res.data.length > 0) {
@@ -548,13 +618,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 password: encryptPassword(u.password || 'admin123'),
               });
             });
-            return Array.from(map.values());
+            const merged = Array.from(map.values());
+            saveSharedUsersToServer(merged).catch(() => {});
+            return merged;
           });
         }
       })
       .catch((err) => console.error('Erro na sincronização inicial de usuários:', err));
 
-    // Buscar lotes de produção cadastrados no Supabase
     fetchRecordsFromSupabase()
       .then((res) => {
         if (isMounted && res.success && res.data && res.data.length > 0) {
@@ -634,6 +705,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const nextUsers = [...users, newUser];
     setUsers(nextUsers);
+    saveSharedUsersToServer(nextUsers).catch(() => {});
 
     const cfg = getSupabaseConfig();
     let syncRes: { success: boolean; message: string } | undefined = undefined;
@@ -655,6 +727,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const userToRemove = users.find((u) => u.id === userId);
     const nextUsers = users.filter((u) => u.id !== userId);
     setUsers(nextUsers);
+    saveSharedUsersToServer(nextUsers).catch(() => {});
 
     const cfg = getSupabaseConfig();
     if (cfg.isConfigured) {
@@ -674,6 +747,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const nextUsers = users.map((u) => (u.id === userId ? { ...u, ...finalUpdates } : u));
     setUsers(nextUsers);
+    saveSharedUsersToServer(nextUsers).catch(() => {});
 
     if (currentUser?.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, ...finalUpdates } : null));
@@ -688,13 +762,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return { success: true, supabaseSync: syncRes };
   };
 
-  const login = (username: string, password?: string): { success: boolean; message?: string } => {
+  const login = async (username: string, password?: string): Promise<{ success: boolean; message?: string }> => {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password?.trim() || '';
 
-    const user = users.find(
+    // 1. Procura na lista local de usuários em memória
+    let user = users.find(
       (u) => u.username.toLowerCase() === cleanUser || u.email?.toLowerCase() === cleanUser
     );
+
+    // 2. Se não encontrou localmente, busca em tempo real diretamente no Supabase
+    if (!user) {
+      try {
+        const remoteUser = await fetchUserByUsernameOrEmail(cleanUser);
+        if (remoteUser) {
+          user = {
+            ...remoteUser,
+            password: encryptPassword(remoteUser.password || 'admin123'),
+          };
+          setUsers((prev) => {
+            const next = [...prev.filter((u) => u.username.toLowerCase() !== cleanUser), user!];
+            try {
+              localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+            } catch {}
+            saveSharedUsersToServer(next).catch(() => {});
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn('Busca de usuário no Supabase:', err);
+      }
+    }
+
+    // 3. Se ainda não encontrou, busca no servidor compartilhado (/api/shared-users)
+    if (!user) {
+      try {
+        const shared = await fetchSharedUsersFromServer();
+        const match = shared.find(
+          (u) => u.username.toLowerCase() === cleanUser || u.email?.toLowerCase() === cleanUser
+        );
+        if (match) {
+          user = {
+            ...match,
+            password: encryptPassword(match.password || 'admin123'),
+          };
+          setUsers((prev) => {
+            const next = [...prev.filter((u) => u.username.toLowerCase() !== cleanUser), user!];
+            try {
+              localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+            } catch {}
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn('Busca de usuário compartilhado:', err);
+      }
+    }
 
     if (!user) {
       return {
