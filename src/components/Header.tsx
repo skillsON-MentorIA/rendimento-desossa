@@ -7,6 +7,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { APP_VERSION } from '../version';
 
 interface HeaderProps {
   activeTab?: string;
@@ -65,6 +66,9 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">
                   BH FOODS • LINHA INDUSTRIAL DE DESOSSA
+                </span>
+                <span className="hidden sm:inline-block font-mono text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200 select-none" title={`Versão do Sistema: ${APP_VERSION}`}>
+                  v{APP_VERSION}
                 </span>
               </div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight">

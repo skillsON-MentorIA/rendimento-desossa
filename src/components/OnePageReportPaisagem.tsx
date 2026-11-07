@@ -13,7 +13,8 @@ import {
   Smartphone,
   ChevronDown,
   Percent,
-  Bone
+  Bone,
+  Flame
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ProductionRecord, CutType } from '../types';
@@ -22,6 +23,7 @@ import {
   formatPct,
   calculateEffectiveTotalWorkforce
 } from '../utils/calculations';
+import { APP_VERSION } from '../version';
 
 interface OnePageReportPaisagemProps {
   onNavigateToGeneralReport?: () => void;
@@ -77,6 +79,11 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
         entradaKg: 0,
         qtdPecas: 0,
         saidaKg: 0,
+        saleableCutsKg: 0,
+        boneKg: 0,
+        bonePct: 0,
+        fatKg: 0,
+        fatPct: 0,
         rendimentoNetPct: 0,
         subProdutosKg: 0,
         subProdutosPct: 0,
@@ -92,10 +99,15 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
     const entradaKg = monthRecords.reduce((acc, r) => acc + (r.rawMaterialWeightKg || 0), 0);
     const qtdPecas = monthRecords.reduce((acc, r) => acc + (r.rawMaterialBoxes || 0), 0);
     const saidaKg = monthRecords.reduce((acc, r) => acc + (r.finishedProductWeightKg || 0), 0);
-    const subProdutosKg = monthRecords.reduce((acc, r) => acc + (r.boneWeightKg || 0) + (r.fatWeightKg || 0), 0);
+    const boneKg = monthRecords.reduce((acc, r) => acc + (r.boneWeightKg || 0), 0);
+    const fatKg = monthRecords.reduce((acc, r) => acc + (r.fatWeightKg || 0), 0);
+    const subProdutosKg = boneKg + fatKg;
     const quebraKg = monthRecords.reduce((acc, r) => acc + (r.lossKg || 0), 0);
+    const saleableCutsKg = Math.max(0, saidaKg - subProdutosKg);
 
-    const rendimentoNetPct = entradaKg > 0 ? ((saidaKg - subProdutosKg) / entradaKg) * 100 : 0;
+    const rendimentoNetPct = entradaKg > 0 ? (saleableCutsKg / entradaKg) * 100 : 0;
+    const bonePct = entradaKg > 0 ? (boneKg / entradaKg) * 100 : 0;
+    const fatPct = entradaKg > 0 ? (fatKg / entradaKg) * 100 : 0;
     const subProdutosPct = entradaKg > 0 ? (subProdutosKg / entradaKg) * 100 : 0;
     const quebraPct = entradaKg > 0 ? (quebraKg / entradaKg) * 100 : 0;
     const pesoMedioPeca = qtdPecas > 0 ? entradaKg / qtdPecas : 0;
@@ -108,6 +120,11 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
       entradaKg,
       qtdPecas,
       saidaKg,
+      saleableCutsKg,
+      boneKg,
+      bonePct,
+      fatKg,
+      fatPct,
       rendimentoNetPct,
       subProdutosKg,
       subProdutosPct,
@@ -415,7 +432,7 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
         </header>
 
         {/* =========================================================================
-            2) OS 4 BOXES DE INDICADORES ESTRATÉGICOS (CONSOLIDADO DO MÊS)
+            1) OS 4 BOXES DE INDICADORES ESTRATÉGICOS (CONSOLIDADO DO MÊS)
             Sendo 1 box para cada tipo de carne:
             - BOX 1: DIANTEIRO BOVINO (DT)
             - BOX 2: TRASEIRO BOVINO (TR)
@@ -427,7 +444,7 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
-              2. Painéis de Indicadores Estratégicos por Tipo de Carne (Consolidado do Mês)
+              1. Painéis de Indicadores Estratégicos por Tipo de Carne (Consolidado do Mês)
             </span>
             <span className="text-[9px] text-slate-400 font-medium">
               Indicadores apurados especificamente para cada matéria-prima
@@ -583,19 +600,19 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
         </section>
 
         {/* =========================================================================
-            3) TABELA CONSOLIDADA POR TIPO DE DESOSSA NO MÊS
+            2) TABELA CONSOLIDADA POR TIPO DE DESOSSA NO MÊS & BALANÇO DE MASSA
             Conforme solicitado: Manter APENAS as colunas:
             - TIPO DE DESOSSA
             - QTD. LOTES
             - ENTRADA (Kg)
             - % DO TOTAL
-            Layout harmônico integrado com barra de distribuição proporcional
+            E ao lado o Gráfico de BALANÇO DE MASSA & SUB PRODUTOS com Rendimento Global
            ========================================================================= */}
         <section className="mb-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-rose-700 inline-block"></span>
-              3. Tabela Consolidada por Tipo de Desossa no Mês (Volume de Entrada e Representatividade)
+              2. Tabela Consolidada por Tipo de Desossa no Mês (Volume de Entrada e Representatividade)
             </span>
             <span className="text-[9px] text-slate-400 font-medium">
               Dados auditados do SisAtak Industrial
@@ -604,7 +621,7 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
             {/* Tabela de 4 colunas estritas */}
-            <div className="lg:col-span-8 overflow-hidden border border-slate-300 rounded-xl shadow-2xs">
+            <div className="lg:col-span-6 overflow-hidden border border-slate-300 rounded-xl shadow-2xs flex flex-col justify-between bg-white">
               <table className="w-full text-xs text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white font-black uppercase tracking-wider text-[9px]">
@@ -653,50 +670,111 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
               </table>
             </div>
 
-            {/* Painel Lateral Harmônico de Apoio: Barra de Distribuição & Destaques de Produção */}
-            <div className="lg:col-span-4 bg-slate-50 border border-slate-300 rounded-xl p-3 flex flex-col justify-between shadow-2xs">
-              <div>
-                <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight block mb-2">
-                  Distribuição Percentual de Entrada (Mix da Indústria)
-                </span>
-
-                {/* Barra Visual Proporcional Multi-Segmentada */}
-                <div className="h-3 w-full rounded-full overflow-hidden flex bg-slate-200 border border-slate-300 mb-2.5">
-                  {cutTypesSummary.map((cut) => {
-                    let color = 'bg-amber-500';
-                    if (cut.key === 'TRASEIRO') color = 'bg-rose-600';
-                    if (cut.key === 'COSTELA') color = 'bg-orange-500';
-                    if (cut.key === 'SUINO') color = 'bg-pink-500';
-                    if (cut.pctTotal <= 0) return null;
-                    return (
-                      <div
-                        key={cut.key}
-                        style={{ width: `${cut.pctTotal}%` }}
-                        className={`${color} h-full transition-all`}
-                        title={`${cut.label}: ${cut.pctTotal.toFixed(1)}%`}
-                      />
-                    );
-                  })}
+            {/* Painel Lateral: BALANÇO DE MASSA & SUB PRODUTOS (CONFORME SOLICITADO NO ANEXO) */}
+            <div className="lg:col-span-6 bg-white border border-slate-300 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between shadow-2xs">
+              {/* Cabeçalho do Balanço de Massa */}
+              <div className="flex items-start justify-between pb-1.5 border-b border-slate-100">
+                <div>
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                    BALANÇO DE MASSA & SUB PRODUTOS
+                  </h3>
+                  <p className="text-[9.5px] text-slate-500 font-medium leading-tight mt-0.5">
+                    Aproveitamento de carcaça: Cortes Vendáveis vs Sub Produtos (Osso e Sebo)
+                  </p>
                 </div>
-
-                {/* Legenda com Valores */}
-                <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                  {cutTypesSummary.map((cut) => (
-                    <div key={cut.key} className="flex items-center justify-between bg-white px-2 py-1 rounded border border-slate-200">
-                      <span className="flex items-center gap-1 font-semibold text-slate-700 truncate">
-                        <span>{cut.icon}</span>
-                        <span>{cut.code}:</span>
-                      </span>
-                      <span className="font-black text-slate-900">{cut.pctTotal.toFixed(1).replace('.', ',')}%</span>
-                    </div>
-                  ))}
+                <div className="bg-slate-100 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">
+                  Total MP: {formatKg(generalSummary.entradaKg, 0)}
                 </div>
               </div>
 
-              {/* Indicador Global Síntese da Fábrica */}
-              <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between text-[10px]">
-                <span className="text-slate-500 font-medium">Rendimento Médio Global:</span>
-                <span className="font-black text-emerald-800 text-xs">
+              {/* 4 Linhas com Barras de Progresso Idênticas ao Anexo */}
+              <div className="space-y-2 py-1.5">
+                {/* 1. Cortes Vendáveis */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Cortes Vendáveis (Nobre/Especial/Recorte)</span>
+                    </div>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatKg(generalSummary.saleableCutsKg, 1)} ({generalSummary.rendimentoNetPct.toFixed(2).replace('.', ',')}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(5, generalSummary.rendimentoNetPct))}%` }}
+                      className="bg-emerald-600 h-full rounded-full transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Osso Total Extraído */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                      <Bone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span>Osso Total Extraído</span>
+                    </div>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatKg(generalSummary.boneKg, 1)} ({generalSummary.bonePct.toFixed(2).replace('.', ',')}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(3, generalSummary.bonePct * 2.2))}%` }}
+                      className="bg-slate-500 h-full rounded-full transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Sebo e Gordura Industrial */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                      <Flame className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span>Sebo e Gordura Industrial</span>
+                    </div>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatKg(generalSummary.fatKg, 1)} ({generalSummary.fatPct.toFixed(2).replace('.', ',')}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(2, generalSummary.fatPct * 4.5))}%` }}
+                      className="bg-amber-500 h-full rounded-full transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Perda / Quebra Físico-Química */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>Perda / Quebra Físico-Química</span>
+                    </div>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatKg(generalSummary.quebraKg, 1)} ({generalSummary.quebraPct.toFixed(3).replace('.', ',')}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(2, generalSummary.quebraPct * 12))}%` }}
+                      className={`h-full rounded-full transition-all ${
+                        generalSummary.quebraPct > 1.0 ? 'bg-rose-600' : 'bg-emerald-600'
+                      }`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Rendimento Médio Global Integrado no mesmo box */}
+              <div className="mt-1 pt-1.5 border-t border-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 inline-block"></span>
+                  <span>Rendimento Médio Global (Desossa Líquida):</span>
+                </div>
+                <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-300 shadow-2xs">
                   {generalSummary.rendimentoNetPct.toFixed(2).replace('.', ',')}%
                 </span>
               </div>
@@ -716,8 +794,11 @@ export const OnePageReportPaisagem: React.FC<OnePageReportPaisagemProps> = ({
             <span className="font-bold text-rose-800">One Page Report Mensal</span>
           </div>
 
-          <div className="text-right text-[9px] text-slate-400">
-            Documento Gerencial Confidencial • Uso Interno e Restrito à Diretoria
+          <div className="text-right text-[9px] text-slate-400 font-mono flex items-center gap-1.5">
+            <span className="bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded border border-slate-200 font-semibold">
+              v{APP_VERSION}
+            </span>
+            <span>• Documento Gerencial Confidencial • Uso Interno e Restrito</span>
           </div>
         </footer>
 

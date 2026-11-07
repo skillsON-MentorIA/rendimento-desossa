@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { getEnrolledBiometric, authenticateWithFaceBiometrics, BiometricProfile } from '../utils/biometricAuth';
+import { APP_VERSION } from '../version';
 
 export const LoginScreen: React.FC = () => {
   const { login } = useApp();
@@ -227,6 +228,12 @@ export const LoginScreen: React.FC = () => {
           <p className="text-[11px] text-slate-400">
             Acesso restrito e monitorado • Módulo de Desossa Industrial
           </p>
+          <div className="pt-1 flex items-center justify-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-mono text-[10px] border border-slate-200 transition-colors select-none" title="Versão do Sistema">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Versão {APP_VERSION}
+            </span>
+          </div>
         </div>
       </div>
     </div>

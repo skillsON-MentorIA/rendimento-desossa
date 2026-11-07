@@ -21,6 +21,7 @@ import {
   FileText
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { APP_VERSION } from '../version';
 
 interface SidebarProps {
   activeTab: string;
@@ -210,8 +211,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Navigation Menu */}
         <nav className="flex-1 overflow-y-auto px-2.5 py-3 space-y-1">
           {(!isCollapsed || isMobileOpen) && (
-            <div className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Navegação Principal
+            <div className="px-2 pb-1.5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <span>Navegação Principal</span>
+              <span className="font-mono text-[9px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60 font-medium select-none" title={`Versão do Sistema: ${APP_VERSION}`}>
+                v{APP_VERSION}
+              </span>
             </div>
           )}
           {menuItems.map((item) => {
@@ -335,12 +339,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Footer Controls: Only Collapse / Expand */}
+        {/* Footer Controls: Version & Collapse / Expand */}
         {(!isCollapsed || isMobileOpen) ? (
-          <div className="px-3 py-2 border-t border-slate-800/60 bg-slate-950/40 shrink-0">
+          <div className="px-3 py-2 border-t border-slate-800/60 bg-slate-950/40 shrink-0 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono px-1">
+              <span className="text-slate-400">Versão:</span>
+              <span className="text-slate-300 font-semibold bg-slate-800/70 px-1.5 py-0.5 rounded border border-slate-700/60">
+                {APP_VERSION}
+              </span>
+            </div>
             <button
               onClick={() => setIsCollapsed(true)}
-              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white text-[11px] font-medium border border-slate-700/40 transition-colors"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white text-[11px] font-medium border border-slate-700/40 transition-colors cursor-pointer"
               title="Recolher Menu Lateral"
             >
               <span className="flex items-center gap-2">
@@ -351,11 +361,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         ) : (
-          <div className="p-2 border-t border-slate-800/60 flex justify-center shrink-0">
+          <div className="p-2 border-t border-slate-800/60 flex flex-col items-center gap-1 shrink-0">
+            <span className="text-[9px] font-mono text-slate-400" title={`Versão ${APP_VERSION}`}>
+              v{APP_VERSION.slice(-1)}
+            </span>
             <button
               onClick={() => setIsCollapsed(false)}
-              title="Expandir Menu Lateral"
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+              title={`Expandir Menu Lateral (Versão ${APP_VERSION})`}
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors cursor-pointer"
             >
               <PanelLeftOpen className="w-4 h-4 text-rose-400" />
             </button>

@@ -40,6 +40,7 @@ import {
   BiometricProfile
 } from '../utils/biometricAuth';
 import { OnePageReportPaisagem } from './OnePageReportPaisagem';
+import { APP_VERSION } from '../version';
 
 interface ExecutiveMobileViewProps {
   onBack?: () => void;
@@ -404,9 +405,14 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
               <h1 className="text-sm sm:text-base font-black tracking-tight text-white uppercase leading-none print:text-black">
                 LINHA INDUSTRIAL DE DESOSSA
               </h1>
-              <p className="text-[11px] text-zinc-400 font-medium tracking-wide mt-0.5 print:text-slate-600">
-                BH Foods • Cockpit Executivo de Indicadores
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-[11px] text-zinc-400 font-medium tracking-wide print:text-slate-600">
+                  BH Foods • Cockpit Executivo
+                </p>
+                <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 select-none" title={`Versão: ${APP_VERSION}`}>
+                  v{APP_VERSION}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1246,7 +1252,7 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
             BH FOODS COMERCIO E INDUSTRIA LTDA
           </p>
           <p>
-            Painel Executivo Móvel • Versão 3.5 • Sincronizado com Supabase Cloud
+            Painel Executivo Móvel • Versão {APP_VERSION} • Sincronizado com Supabase Cloud
           </p>
         </footer>
       </main>
