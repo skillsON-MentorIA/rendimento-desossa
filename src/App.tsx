@@ -15,6 +15,7 @@ import { SuinoView } from './components/SuinoView';
 import { UploadView } from './components/UploadView';
 import { OnePageReport } from './components/OnePageReport';
 import { OnePageReportCortes } from './components/OnePageReportCortes';
+import { OnePageReportPaisagem } from './components/OnePageReportPaisagem';
 import { SettingsView } from './components/SettingsView';
 import { AdminView } from './components/AdminView';
 import { LoginScreen } from './components/LoginScreen';
@@ -107,6 +108,7 @@ const MainLayout: React.FC = () => {
           isCollapsed={sidebarCollapsed}
           onNavigateToOnePage={() => setCurrentTab('report')}
           onNavigateToCortes={() => setCurrentTab('report_cortes')}
+          onNavigateToPaisagem={() => setCurrentTab('report_paisagem')}
           onOpenLogin={() => setIsLoginModalOpen(true)}
         />
 
@@ -152,6 +154,13 @@ const MainLayout: React.FC = () => {
             <OnePageReportCortes
               selectedRecordId={selectedRecordForReport}
               onNavigateToGeneralReport={() => setCurrentTab('report')}
+            />
+          )}
+
+          {currentTab === 'report_paisagem' && (
+            <OnePageReportPaisagem
+              onNavigateToGeneralReport={() => setCurrentTab('report')}
+              onNavigateToMobileCockpit={() => setCurrentTab('mobile_diretoria')}
             />
           )}
 

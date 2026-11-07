@@ -39,6 +39,7 @@ import {
   clearBiometricEnrollment,
   BiometricProfile
 } from '../utils/biometricAuth';
+import { OnePageReportPaisagem } from './OnePageReportPaisagem';
 
 interface ExecutiveMobileViewProps {
   onBack?: () => void;
@@ -83,6 +84,7 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
   const [showInstallInstructions, setShowInstallInstructions] = useState<boolean>(false);
+  const [showLandscapeReportModal, setShowLandscapeReportModal] = useState<boolean>(false);
 
   // Device detection
   const isIOS = typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent || '');
@@ -318,9 +320,9 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
     window.open(url, '_blank');
   };
 
-  // Handle Print/PDF
+  // Handle Print/PDF - Abre o Relatório Gerencial One Page Report Paisagem
   const handleGeneratePDF = () => {
-    window.print();
+    setShowLandscapeReportModal(true);
   };
 
   // Chart values calculation
@@ -1064,7 +1066,7 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
               className="w-full py-3 px-4 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
             >
               <FileText className="w-4 h-4 text-rose-400" />
-              <span>Gerar / Baixar PDF</span>
+              <span>Gerar / Baixar PDF (OPR Mensal)</span>
             </button>
           </div>
         </section>
@@ -1248,6 +1250,26 @@ export const ExecutiveMobileView: React.FC<ExecutiveMobileViewProps> = ({ onBack
           </p>
         </footer>
       </main>
+
+      {/* Modal One Page Report Mensal */}
+      {showLandscapeReportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md overflow-y-auto p-2 sm:p-4 animate-in fade-in">
+          <div className="max-w-[1440px] mx-auto mb-2 flex justify-between items-center print:hidden bg-zinc-900 border border-zinc-700 px-4 py-2 rounded-xl text-white">
+            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+              <span>📄</span> One Page Report Mensal • Visualização e Impressão
+            </span>
+            <button
+              onClick={() => setShowLandscapeReportModal(false)}
+              className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold cursor-pointer"
+            >
+              ✕ Fechar / Voltar ao Cockpit
+            </button>
+          </div>
+          <OnePageReportPaisagem
+            onNavigateToMobileCockpit={() => setShowLandscapeReportModal(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

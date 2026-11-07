@@ -17,7 +17,8 @@ import {
   LogOut,
   User as UserIcon,
   X,
-  Smartphone
+  Smartphone,
+  FileText
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -97,8 +98,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'report_cortes',
       label: 'OPR Cortes (Tipos de Cortes)',
       icon: Layers,
-      badge: 'Novo',
+      badge: 'Cortes',
       desc: 'Consolidado por Tipo vs Padrão',
+    },
+    {
+      id: 'report_paisagem',
+      label: 'OPR Mensal (Gerencial)',
+      icon: FileText,
+      badge: 'Mensal',
+      desc: '1 Página Síntese Mensal',
     },
     {
       id: 'mobile_diretoria',

@@ -15,6 +15,7 @@ interface HeaderProps {
   isCollapsed: boolean;
   onNavigateToOnePage: () => void;
   onNavigateToCortes?: () => void;
+  onNavigateToPaisagem?: () => void;
   onOpenLogin?: () => void;
 }
 
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   isCollapsed,
   onNavigateToOnePage,
   onNavigateToCortes,
+  onNavigateToPaisagem,
 }) => {
   const { currentUser, logout } = useApp();
 
@@ -95,6 +97,19 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Layers className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">OPR Cortes</span>
+            </button>
+          )}
+
+          {onNavigateToPaisagem && (
+            <button
+              onClick={onNavigateToPaisagem}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+                activeTab === 'report_paisagem' ? 'bg-emerald-950 ring-2 ring-emerald-400 font-bold' : 'bg-emerald-800 hover:bg-emerald-700'
+              }`}
+              title="Abrir One Page Report Mensal (Painéis por Tipo de Carne e Consolidado)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">OPR Mensal</span>
             </button>
           )}
 
